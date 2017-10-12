@@ -1,5 +1,4 @@
-library(mudan)
-source('../R/mudan.R')
+library(MUDAN)
 
 ## test functions using simulated data
 simulate.data <- function(G=5, N=100, M=1000, initmean=0, initvar=10, upreg=10, upregvar=10, ng=100, seed=0, plot=TRUE) {
@@ -41,20 +40,15 @@ test.sim <- function() {
 
     ## discover subpopulations, train discriminating model
     cd <- as.matrix(mat)
-    dim(cd)
     matnorm <- normalizeVariance(mat=cd, plot=TRUE, details=FALSE)
     pcs <- getPcs(matnorm, nGenes=100, nPcs=10)
-    models <- lapply(c(15, 30, 50, 100, 150), function(k) {
-        com <- getKnnMembership(pcs, k=k, method=igraph::cluster_infomap)
-        reference.model <- modelLda(matnorm, com)
-    })
-
-    ## apply model to any normalization common to other datasets
-    mat <- counts2cpms(cd)
-    reference.emb <- tsneLda(mat=mat, model=models, com=group, perplexity=30, plot=FALSE)
+    com <- getKnnMembership(pcs, k=30, method=igraph::cluster_infomap)
+    model <- modelLda(matnorm, com)
+    emb <- tsneLda(mat=mat, model=model, com=group, perplexity=30, plot=FALSE)
 
     ## plot resulting embedding
-    plotEmbedding(reference.emb,
+    par(mfrow=c(1,1), mar=rep(5,4))
+    plotEmbedding(emb,
                   groups=group,
                   mark.clusters = FALSE,
                   show.legend=TRUE,
@@ -62,3 +56,20 @@ test.sim <- function() {
                   main="MUDAN with true cell annotations")
 }
 
+## test functions using real annotated data
+test.reference <- function(){
+  data("referenceAnnot")
+  data("referenceCounts")
+
+  matnorm <- normalizeVariance(mat=as.matrix(referenceCounts), plot=TRUE, details=FALSE)
+  model <- modelLda(mat, referenceAnnot, nfeatures=1000)
+  emb <- tsneLda(mat=mat, model=model, com=referenceAnnot, perplexity=30, plot=FALSE)
+
+  par(mfrow=c(1,1), mar=rep(5,4))
+  plotEmbedding(emb,
+                groups=referenceAnnot,
+                mark.clusters = FALSE,
+                show.legend=TRUE,
+                legend.x = 'bottomleft',
+                main="MUDAN with true cell annotations")
+}
