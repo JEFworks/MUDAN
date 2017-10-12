@@ -3,7 +3,8 @@
 ##' Filter counts matrix based on gene and cell requirements
 ##'
 ##' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
-##' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1.8e3)
+##' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)
+##' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
 ##' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
 ##' @param min.detected Minimum number of cells a gene must be seen in. Genes not seen in a sufficient number of cells will be removed (default: 5)
 ##'
@@ -18,13 +19,38 @@
 ##'
 ##' @export
 ##'
-cleanCounts <- function(counts, min.lib.size = 1.8e3, min.reads = 10, min.detected = 5) {
+cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.reads = 1, min.detected = 1) {
     ## filter out low-gene cells
-    counts <- counts[, colSums(counts>0)>min.lib.size]
+    counts <- counts[, colSums(counts)>min.lib.size]
+    ## filter out potential doublets
+    counts <- counts[, colSums(counts)<max.lib.size]
     ## remove genes that don't have many reads
     counts <- counts[rowSums(counts)>min.reads, ]
     ## remove genes that are not seen in a sufficient number of cells
     counts <- counts[rowSums(counts>0)>min.detected, ]
+    return(counts)
+}
+
+
+##' Normalizes counts to CPM
+##'
+##' Normalizes raw counts to log10 counts per million with pseudocount
+##'
+##' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
+##' @param pseudocount Pseudocount for log transformation. (default: 1)
+##'
+##' @return a normalized matrix
+##'
+##' @examples {
+##' data(pbmcA)
+##' mat <- counts2cpms(pbmcA)
+##' }
+##'
+##' @export
+##'
+counts2cpms <- function(counts, pseudocount=1) {
+    counts <- t(t(counts)/Rfast::colsums(counts))
+    counts <- log10(counts*1e6+pseudocount)
     return(counts)
 }
 
@@ -57,6 +83,10 @@ cleanCounts <- function(counts, min.lib.size = 1.8e3, min.reads = 10, min.detect
 ##' @export
 ##'
 normalizeVariance <- function(mat, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
+    if(class(mat)!='matrix') {
+        mat <- as.matrix(mat)
+    }
+
     mat <- t(mat) ## make rows as cells, cols as genes
 
     if(verbose) {
@@ -78,7 +108,7 @@ normalizeVariance <- function(mat, gam.k=5, alpha=0.05, plot=FALSE, use.unadjust
         m <- lm(v ~ m, data = df[vi,])
     } else {
         if(verbose) {
-            print("Using gam...")
+            print(paste0("Using gam with k=", gam.k, "..."))
         }
         m <- mgcv::gam(v ~ s(m, k = gam.k), data = df[vi,])
     }
@@ -163,23 +193,24 @@ bh.adjust <- function(x, log = FALSE) {
 ##'
 ##' @export
 ##'
-getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100) {
+getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, ...) {
+    if(class(mat)!='matrix') {
+        mat <- as.matrix(mat)
+    }
 
     ## get variable genes
-    vi <- Rfast::rowVars(mat)
-    names(vi) <- rownames(mat)
-    vgenes <- names(sort(vi, decreasing=TRUE)[seq_len(nGenes)])
+    vgenes <- getVariableGenes(mat, nGenes)
     mat <- mat[vgenes,]
 
     ## get PCs
-    pcs <- fastPca(t(mat), nPcs)
+    pcs <- fastPca(t(mat), nPcs, ...)
     m <- t(pcs$l)
     colnames(m) <- colnames(mat)
     rownames(m) <- paste0('PC', seq_len(nPcs))
 
     return(m)
 }
-fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=FALSE, transpose=FALSE) {
+fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=FALSE, transpose=FALSE, ...) {
     ## note transpose is meant to speed up calculations when neither scaling nor centering is required
     if(transpose) {
         if(center) {
@@ -188,18 +219,23 @@ fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=FALSE, transpose=F
         if(scale) {
             m <- m/sqrt(Rfast::rowsums(m*m))
         }
-        a <- irlba::irlba(tcrossprod(m)/(ncol(m)-1), nu=0, nv=nPcs, tol=tol)
+        a <- irlba::irlba(tcrossprod(m)/(ncol(m)-1), nu=0, nv=nPcs, tol=tol, ...)
         a$l <- t(t(a$v) %*% m)
     } else {
         if(scale||center) {
             m <- scale(m, scale=scale, center=center)
         }
-        a <- irlba::irlba(crossprod(m)/(nrow(m)-1), nu=0, nv=nPcs, tol=tol)
+        a <- irlba::irlba(crossprod(m)/(nrow(m)-1), nu=0, nv=nPcs, tol=tol, ...)
         a$l <- m %*% a$v
     }
     return(a)
 }
-
+getVariableGenes <- function(mat, nGenes) {
+    vi <- Rfast::rowVars(mat)
+    names(vi) <- rownames(mat)
+    vgenes <- names(sort(vi, decreasing=TRUE)[seq_len(nGenes)])
+    return(vgenes)
+}
 
 ##' Get approximate nearest neighbors
 ##'
@@ -240,10 +276,12 @@ getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
         print("calculating clustering ...")
     }
     g <- igraph::graph.adjacency(adj, mode="undirected")
-    g <- simplify(g)
+    g <- igraph::simplify(g)
     km <- method(g)
     if(verbose) {
-        print(paste0('graph modularity: ', modularity(km)))
+        mod <- igraph::modularity(km)
+        if(mod < 0.3) { print('WARNING') }
+        print(paste0('graph modularity: ', mod))
     }
 
     ## community membership
@@ -263,6 +301,7 @@ getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 ##'
 ##' @param mat Expression matrix with cells as columns, transferable features such as genes as rows.
 ##' @param com Community annotations
+##' @param ncores Number of cores for parallelization.
 ##' @param verbose Verbosity (default: TRUE)
 ##' @param retest Whether to retest model for accuracy
 ##'
@@ -279,8 +318,46 @@ getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 ##'
 ##' @export
 ##'
-modelLda <- function(mat, com, verbose=TRUE, retest=TRUE) {
-    ## make data frame
+modelLda.multicore <- function(mat, com, ncores=10, verbose=TRUE, retest=TRUE) {
+    ## split features randomly into ncores groups
+    set.seed(0)
+    feature.set <- split(sample(rownames(mat)), seq_len(ncores), drop = FALSE)
+
+    ## train model for each feature set in parallele to speed things up
+    models <- mclapply(feature.set, function(vi) {
+        ## make data frame
+        df <- data.frame(celltype=com, as.matrix(t(mat[vi,])))
+
+        if(verbose) {
+            print("calculating LDA ...")
+        }
+        model <- MASS::lda(celltype ~ ., data=df)
+
+        if(retest) {
+            ## predict our data based on model
+            model.output <- predict(model, df)
+            if(verbose) {
+                print("LDA prediction accuracy ...")
+                print(table(model.output$class==com))
+            }
+        }
+
+        return(model)
+    }, mc.cores=ncores)
+
+    return(models)
+}
+modelLda <- function(mat, com, nfeatures=nrow(mat), verbose=TRUE, retest=TRUE) {
+    ## split features randomly into ncores groups
+    if(nfeatures < nrow(mat)) {
+        ## random?
+        ## set.seed(0)
+        ## vi <- sample(rownames(mat), nfeatures)
+        ## most variable
+        vi <- getVariableGenes(mat, nfeatures)
+        mat <- mat[vi,]
+    }
+
     df <- data.frame(celltype=com, as.matrix(t(mat)))
 
     if(verbose) {
