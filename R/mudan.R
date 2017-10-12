@@ -347,15 +347,19 @@ modelLda.multicore <- function(mat, com, ncores=10, verbose=TRUE, retest=TRUE) {
 
     return(models)
 }
-modelLda <- function(mat, com, nfeatures=nrow(mat), verbose=TRUE, retest=TRUE) {
-    ## split features randomly into ncores groups
+modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, retest=TRUE) {
+    ## filter to reduce feature modeling space
     if(nfeatures < nrow(mat)) {
-        ## random?
-        ## set.seed(0)
-        ## vi <- sample(rownames(mat), nfeatures)
-        ## most variable
-        vi <- getVariableGenes(mat, nfeatures)
-        mat <- mat[vi,]
+        if(random) {
+            ## random
+            set.seed(0)
+            vi <- sample(rownames(mat), nfeatures)
+            mat <- mat[vi,]
+        } else {
+            ## most variable (assumes properly variance normalized matrix...fix)
+            vi <- getVariableGenes(mat, nfeatures)
+            mat <- mat[vi,]
+        }
     }
 
     df <- data.frame(celltype=com, as.matrix(t(mat)))
