@@ -48,12 +48,14 @@ cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.re
 ##'
 ##' @export
 ##'
-counts2cpms <- function(counts, pseudocount=1) {
+normalizeCounts <- function(counts, depthScale=1e6, logScale=FALSE) {
     counts <- t(t(counts)/Rfast::colsums(counts))
-    counts <- log10(counts*1e6+pseudocount)
+    counts <- counts*depthScale
+    if(logScale) {
+        counts <- log10(counts+1)
+    }
     return(counts)
 }
-
 
 ##' Normalize gene expression variance relative to transcriptome-wide expectations
 ##' (Modified from SCDE/PAGODA2 code; now uses Rfast)
@@ -82,12 +84,12 @@ counts2cpms <- function(counts, pseudocount=1) {
 ##'
 ##' @export
 ##'
-normalizeVariance <- function(mat, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
-    if(class(mat)!='matrix') {
-        mat <- as.matrix(mat)
+normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
+    if(class(cd)!='matrix') {
+        cd <- as.matrix(cd)
     }
 
-    mat <- t(mat) ## make rows as cells, cols as genes
+    mat <- t(cd) ## make rows as cells, cols as genes
 
     if(verbose) {
         print("Calculating variance fit ...")
@@ -149,7 +151,7 @@ normalizeVariance <- function(mat, gam.k=5, alpha=0.05, plot=FALSE, use.unadjust
 
     if(!details) {
         ## variance normalize
-        norm.mat <- t(mat)*df$gsf
+        norm.mat <- cd*df$gsf
         return(norm.mat)
     }
     else {
@@ -258,7 +260,7 @@ getVariableGenes <- function(mat, nGenes) {
 ##'
 ##' @export
 ##'
-getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TRUE) {
+getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TRUE, details=FALSE) {
     if(verbose) {
         print("finding approximate nearest neighbors ...")
     }
@@ -291,7 +293,28 @@ getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
         print("identifying cluster membership ...")
         print(table(com))
     }
-    return(com)
+    if(details) {
+        return(list(com=com, mod=mod, g=g))
+    }
+    else {
+        return(com)
+    }
+}
+## Test a set of ks
+optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_walktrap, verbose=TRUE) {
+    results <- lapply(ks, function(k) {
+        if(verbose) {
+            print(paste0('testing k:', k, ' ...'))
+        }
+        getKnnMembership(mat, k, details=TRUE)
+    })
+    mods <- sapply(results, function(x) x$mod)
+    i <- which(mods==max(mods))
+    if(verbose) {
+        print(paste0('optimal k:', ks[i], ' ...'))
+    }
+    com.final <- results[[i]]$com
+    return(com.final)
 }
 
 
@@ -380,6 +403,89 @@ modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, 
 
     return(model)
 }
+
+
+getDifferentialGenes <- function(mat, com, zThreshold=3, upregulatedOnly=TRUE, verbose=FALSE, ncores=10) {
+
+    if(class(mat)!='matrix') {
+        mat <- as.matrix(mat)
+    }
+    if(class(com)!='factor') {
+        com <- factor(com)
+    }
+    if(!all(colnames(mat) %in% names(com))) { warning("cluster vector doesn't specify groups for all of the cells, dropping missing cells from comparison")}
+    ## determine a subset of cells that's in the cols and cols[cell]!=NA
+    valid.cells <- colnames(mat) %in% names(com)[!is.na(com)]
+    if(!all(valid.cells)) {
+        ## take a subset of the count matrix
+        mat <- mat[, valid.cells]
+    }
+    ## reorder cols
+    cols <- com
+    cols <- as.factor(cols[match(colnames(mat),names(cols))])
+    cols <- as.factor(cols)
+
+    if(verbose) {
+        print(paste0("Running differential expression with ", length(levels(cols)), " groups ... "))
+    }
+
+    ## run simple wilcoxon test comparing each group with the rest
+    diffgenes <- lapply(levels(cols), function(g) {
+        if(verbose) {
+            print(paste0("Testing group ", g, " ... "))
+        }
+
+        x <- mat[,cols==g]
+        y <- mat[,cols!=g]
+
+        ## aucs and pvalues
+        aucs.pvs <- mclapply(seq_len(nrow(x)), function(i) {
+            auc <- markerAuc(x[i,], y[i,])
+            pv <- wilcox.test(x[i,], y[i,], alternative="greater")$p.value
+            return(list(auc, pv))
+        }, mc.cores=ncores)
+        aucs <- sapply(aucs.pvs, function(x) x[[1]])
+        pvs <- sapply(aucs.pvs, function(x) x[[2]])
+
+        ## assess average fold change
+        xm <- Rfast::rowmeans(x)
+        ym <- Rfast::rowmeans(y)
+        fc <- log2(xm/ym)
+        ## percent expressing
+        pe <- Rfast::rowsums(x>0)/ncol(x)
+        ## z-score
+        zs <- abs(qnorm(1 - (pvs/2), lower.tail=FALSE))*sign(fc)
+
+        ## store p value
+        df <- data.frame(p.value=pvs, marker.auc=aucs, log2.fold.change=fc, percent.expressing=pe, z.score=zs)
+        rownames(df) <- rownames(mat)
+
+        if(upregulatedOnly) {
+            df <- df[df$z.score > zThreshold,]
+        } else {
+            df <- df[abs(df$z.score) > zThreshold,]
+        }
+
+        return(df)
+    })
+    names(diffgenes) <- levels(cols)
+
+    return(diffgenes)
+}
+
+## Test how well does a gene discriminates a population
+## adapted from seurat package
+markerAuc <- function(x, y) {
+    pred <- ROCR::prediction(
+        predictions = c(x, y),
+        labels = c(rep(x = 1, length(x)), rep(x = 0, length(y))),
+        label.ordering = 0:1
+    )
+    perf <- ROCR::performance(pred, measure = "auc")
+    auc <- perf@y.values[[1]]
+    return(auc)
+}
+
 
 
 ##' Run tSNE on LDs from model
