@@ -318,6 +318,8 @@ getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
     ## community membership
     com <- km$membership
     names(com) <- km$names
+    com <- factor(com)
+
     if(verbose) {
         print("identifying cluster membership ...")
         print(table(com))
@@ -592,7 +594,7 @@ getDifferentialGenes <- function(mat, com, upregulated.only=TRUE, z.threshold=3,
 ##'
 ##' @export
 ##'
-tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=TRUE...) {
+tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=TRUE, ...) {
     if(verbose) {
         print('Running LDA models ...')
     }
