@@ -7,6 +7,7 @@
 ##' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
 ##' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
 ##' @param min.detected Minimum number of cells a gene must be seen in. Genes not seen in a sufficient number of cells will be removed (default: 5)
+##' @param verbose Verbosity (default: TRUE)
 ##'
 ##' @return a filtered read count matrix
 ##'
@@ -19,15 +20,28 @@
 ##'
 ##' @export
 ##'
-cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.reads = 1, min.detected = 1) {
+cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.reads = 1, min.detected = 1, verbose=TRUE) {
+    if(class(counts)!='matrix') {
+        counts <- as.matrix(counts)
+    }
+
+    if(verbose) {
+        print(paste0('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...'))
+    }
+
     ## filter out low-gene cells
-    counts <- counts[, colSums(counts)>min.lib.size]
+    counts <- counts[, Rfast::colsums(counts)>min.lib.size]
     ## filter out potential doublets
-    counts <- counts[, colSums(counts)<max.lib.size]
+    counts <- counts[, Rfast::colsums(counts)<max.lib.size]
     ## remove genes that don't have many reads
-    counts <- counts[rowSums(counts)>min.reads, ]
+    counts <- counts[Rfast::rowsums(counts)>min.reads, ]
     ## remove genes that are not seen in a sufficient number of cells
-    counts <- counts[rowSums(counts>0)>min.detected, ]
+    counts <- counts[Rfast::rowsums(counts>0)>min.detected, ]
+
+    if(verbose) {
+        print(paste0('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
+    }
+
     return(counts)
 }
 
@@ -38,6 +52,7 @@ cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.re
 ##'
 ##' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
 ##' @param pseudocount Pseudocount for log transformation. (default: 1)
+##' @param verbose Verbosity (default: TRUE)
 ##'
 ##' @return a normalized matrix
 ##'
@@ -48,14 +63,20 @@ cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.re
 ##'
 ##' @export
 ##'
-normalizeCounts <- function(counts, depthScale=1e6, logScale=FALSE) {
+normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
+    if(class(counts)!='matrix') {
+        counts <- as.matrix(counts)
+    }
+    if(verbose) {
+        print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
+    }
+
     counts <- t(t(counts)/Rfast::colsums(counts))
     counts <- counts*depthScale
-    if(logScale) {
-        counts <- log10(counts+1)
-    }
+
     return(counts)
 }
+
 
 ##' Normalize gene expression variance relative to transcriptome-wide expectations
 ##' (Modified from SCDE/PAGODA2 code; now uses Rfast)
@@ -81,6 +102,8 @@ normalizeCounts <- function(counts, depthScale=1e6, logScale=FALSE) {
 ##' mat <- cleanCounts(pbmcA)
 ##' mat <- normalizeVariance(mat)
 ##' }
+##'
+##' @importFrom mgcv s
 ##'
 ##' @export
 ##'
@@ -112,7 +135,8 @@ normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjuste
         if(verbose) {
             print(paste0("Using gam with k=", gam.k, "..."))
         }
-        m <- mgcv::gam(v ~ s(m, k = gam.k), data = df[vi,])
+        fm <- as.formula(sprintf("v ~ s(m, k = %s)", gam.k))
+        m <- mgcv::gam(fm, data = df[vi,])
     }
     df$res <- -Inf;  df$res[vi] <- resid(m,type='response')
     n.cells <- ncol(mat)
@@ -183,6 +207,7 @@ bh.adjust <- function(x, log = FALSE) {
 ##' @param mat Variance normalized gene expression matrix.
 ##' @param nGenes Number of most variable genes. (default: 1000)
 ##' @param nPcs Number of principal components. (default: 100)
+##' @param verbose Verbosity (default: TRUE)
 ##'
 ##' @return Matrix with columns as cells and rows as principal component eigenvectors.
 ##'
@@ -195,9 +220,13 @@ bh.adjust <- function(x, log = FALSE) {
 ##'
 ##' @export
 ##'
-getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, ...) {
+getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE, ...) {
     if(class(mat)!='matrix') {
         mat <- as.matrix(mat)
+    }
+
+    if(verbose) {
+        print(paste0('Identifying top ', nPcs, ' PCs on ', nGenes, ' most variable genes ...'))
     }
 
     ## get variable genes
@@ -300,7 +329,8 @@ getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
         return(com)
     }
 }
-## Test a set of ks
+## Test a set of ks for modularity
+## TODO: Modularity is a function of k; need permutation to establish baseline and see if observed modularity for a particular k is significantly better than random
 optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_walktrap, verbose=TRUE) {
     results <- lapply(ks, function(k) {
         if(verbose) {
@@ -315,6 +345,45 @@ optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_w
     }
     com.final <- results[[i]]$com
     return(com.final)
+}
+## When there are too many cells, getKNNMembership runs into memory issues
+## Also just takes too long
+## Need subsampling
+getApproxKnnMembership <- function(mat, k1, k2, nsubsample=ncol(mat)*0.75, method=igraph::cluster_walktrap, seed=0, verbose=TRUE) {
+
+    if(verbose) {
+        print(paste0('Subsampling from ', ncol(mat), ' cells to ', nsubsample, ' ... '))
+    }
+    ## random subsampling
+    ## TODO: density based downsampling
+    set.seed(seed)
+    subsample <- sample(colnames(mat), nsubsample)
+
+    if(verbose) {
+        print('Identifying cluster membership for subsample ... ')
+    }
+    pcs.sub <- mat[, subsample]
+    com.sub <- getKnnMembership(pcs.sub, k=k1, method=method)
+
+    data <- mat[, subsample]
+    query <- pcs[, setdiff(colnames(mat), subsample)]
+    knn <- RANN::nn2(t(data), t(query), k=k2)[[1]]
+    rownames(knn) <- colnames(query)
+
+    if(verbose) {
+        print('Imputing cluster membership for rest of cells ... ')
+    }
+    com.nonsub <- unlist(apply(knn, 1, function(x) {
+            ## nearest neighbors in data
+            nn <- colnames(data)[x]
+            ## look at their cell type annotations
+            nn.com <- com.sub[nn]
+            ## get most frequent annotation
+            return(names(sort(table(nn.com), decreasing=TRUE)[1]))
+    }))
+
+    com.all <- factor(c(com.sub, com.nonsub)[colnames(mat)])
+    return(com.all)
 }
 
 
@@ -343,11 +412,12 @@ optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_w
 ##'
 modelLda.multicore <- function(mat, com, ncores=10, verbose=TRUE, retest=TRUE) {
     ## split features randomly into ncores groups
+    ## ISSUE: each set of LDs only dependent on genes in group...not recommended
     set.seed(0)
     feature.set <- split(sample(rownames(mat)), seq_len(ncores), drop = FALSE)
 
     ## train model for each feature set in parallele to speed things up
-    models <- mclapply(feature.set, function(vi) {
+    models <- parallel::mclapply(feature.set, function(vi) {
         ## make data frame
         df <- data.frame(celltype=com, as.matrix(t(mat[vi,])))
 
@@ -405,7 +475,8 @@ modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, 
 }
 
 
-getDifferentialGenes <- function(mat, com, zThreshold=3, upregulatedOnly=TRUE, verbose=FALSE, ncores=10) {
+
+getClusterGeneInfo <- function(mat, com, verbose=FALSE, ncores=10) {
 
     if(class(mat)!='matrix') {
         mat <- as.matrix(mat)
@@ -425,10 +496,6 @@ getDifferentialGenes <- function(mat, com, zThreshold=3, upregulatedOnly=TRUE, v
     cols <- as.factor(cols[match(colnames(mat),names(cols))])
     cols <- as.factor(cols)
 
-    if(verbose) {
-        print(paste0("Running differential expression with ", length(levels(cols)), " groups ... "))
-    }
-
     ## run simple wilcoxon test comparing each group with the rest
     diffgenes <- lapply(levels(cols), function(g) {
         if(verbose) {
@@ -439,7 +506,7 @@ getDifferentialGenes <- function(mat, com, zThreshold=3, upregulatedOnly=TRUE, v
         y <- mat[,cols!=g]
 
         ## aucs and pvalues
-        aucs.pvs <- mclapply(seq_len(nrow(x)), function(i) {
+        aucs.pvs <- parallel::mclapply(seq_len(nrow(x)), function(i) {
             auc <- markerAuc(x[i,], y[i,])
             pv <- wilcox.test(x[i,], y[i,], alternative="greater")$p.value
             return(list(auc, pv))
@@ -460,19 +527,12 @@ getDifferentialGenes <- function(mat, com, zThreshold=3, upregulatedOnly=TRUE, v
         df <- data.frame(p.value=pvs, marker.auc=aucs, log2.fold.change=fc, percent.expressing=pe, z.score=zs)
         rownames(df) <- rownames(mat)
 
-        if(upregulatedOnly) {
-            df <- df[df$z.score > zThreshold,]
-        } else {
-            df <- df[abs(df$z.score) > zThreshold,]
-        }
-
         return(df)
     })
     names(diffgenes) <- levels(cols)
 
     return(diffgenes)
 }
-
 ## Test how well does a gene discriminates a population
 ## adapted from seurat package
 markerAuc <- function(x, y) {
@@ -485,6 +545,30 @@ markerAuc <- function(x, y) {
     auc <- perf@y.values[[1]]
     return(auc)
 }
+## calls on getClusterGeneInfo, filtering results
+getDifferentialGenes <- function(mat, com, upregulated.only=TRUE, z.threshold=3, auc.threshold=0.5, fe.threshold=0.5, M.threshold=0.1, verbose=TRUE, ncores=10) {
+    ## get info
+    df.info <- df.list <- getClusterGeneInfo(mat, com, verbose, ncores)
+
+    ## filter
+    genes <- lapply(df.list, function(df) {
+        if(upregulated.only) {
+            df <- df[df$z.score > z.threshold,]
+        } else {
+            df <- df[abs(df$z.score) > z.threshold,]
+        }
+        df <- df[df$marker.auc > auc.threshold,]
+        df <- df[df$fe > fe.threshold,]
+        df <- df[df$M > M.threshold,]
+        return(rownames(df))
+    })
+    names(genes) <- names(df.list)
+
+    return(list(
+        genes=genes,
+        info=df.info
+    ))
+}
 
 
 
@@ -492,7 +576,7 @@ markerAuc <- function(x, y) {
 ##'
 ##' @export
 ##'
-tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, ...) {
+tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=TRUE...) {
     if(verbose) {
         print('Running LDA models ...')
     }
@@ -513,9 +597,8 @@ tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.
     }
 
     ## tSNE
-    d <- dist(reduction)
-    emb <- Rtsne::Rtsne(d, is_distance=TRUE, perplexity=perplexity, verbose=verbose, num_threads=ncores)$Y
-    rownames(emb) <- labels(d)
+    emb <- Rtsne::Rtsne(reduction, is_distance=FALSE, perplexity=perplexity, verbose=verbose, num_threads=ncores)$Y
+    rownames(emb) <- colnames(mat)
 
     if(plot) {
         if(do.par) {
@@ -524,7 +607,14 @@ tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.
         plotEmbedding(emb, groups=com, ...)
     }
 
-    return(emb)
+    if(details) {
+        return(list(
+            emb=emb,
+            reduction=reduction
+        ))
+    } else {
+        return(emb)
+    }
 }
 
 
