@@ -373,16 +373,32 @@ getApproxKnnMembership <- function(mat, k1, k2, nsubsample=ncol(mat)*0.75, metho
     if(verbose) {
         print('Imputing cluster membership for rest of cells ... ')
     }
-    com.nonsub <- unlist(apply(knn, 1, function(x) {
-            ## nearest neighbors in data
-            nn <- colnames(data)[x]
-            ## look at their cell type annotations
-            nn.com <- com.sub[nn]
-            ## get most frequent annotation
-            return(names(sort(table(nn.com), decreasing=TRUE)[1]))
-    }))
 
-    com.all <- factor(c(com.sub, com.nonsub)[colnames(mat)])
+    ## Use neighbor voting
+    ## com.nonsub <- unlist(apply(knn, 1, function(x) {
+    ##         ## nearest neighbors in data
+    ##         nn <- colnames(data)[x]
+    ##         ## look at their cell type annotations
+    ##         nn.com <- com.sub[nn]
+    ##         ## get most frequent annotation
+    ##         return(names(sort(table(nn.com), decreasing=TRUE)[1]))
+    ## }))
+    ## com.all <- factor(c(com.sub, com.nonsub)[colnames(mat)])
+
+    ## Use model instead
+    ## Inspired by DenSVM
+    df.sub <- data.frame(celltype=com.sub, t(pcs.sub))
+    model <- MASS::lda(celltype ~ ., data=df.sub)
+    df.all <- data.frame(t(pcs))
+    model.output <- predict(model, df.all)
+    com.all <- model.output$class
+    names(com.all) <- rownames(df.all)
+
+    if(verbose) {
+        print("LDA prediction accuracy for subsample ...")
+        print(table(com.all[names(com.sub)]==com.sub))
+    }
+
     return(com.all)
 }
 
