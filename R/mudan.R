@@ -268,9 +268,9 @@ getVariableGenes <- function(mat, nGenes) {
     return(vgenes)
 }
 
-##' Get approximate nearest neighbors
+##' Get clusters by community detection on approximate nearest neighbors
 ##'
-##' Group cells into clusters based on approximate nearest neighbors
+##' Group cells into clusters based on graph-based community detection on approximate nearest neighbors
 ##'
 ##' @param mat Matrix of cells as columns. Features as rows (such as PCs).
 ##' @param k K-nearest neighbor parameter.
@@ -284,12 +284,12 @@ getVariableGenes <- function(mat, nGenes) {
 ##' mat <- cleanCounts(pbmcA)
 ##' mat <- normalizeVariance(mat)
 ##' pcs <- getPcs(mat)
-##' com <- getKnnMembership(pcs, k=30)
+##' com <- getComMembership(pcs, k=30)
 ##' }
 ##'
 ##' @export
 ##'
-getKnnMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TRUE, details=FALSE) {
+getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TRUE, details=FALSE) {
     if(verbose) {
         print("finding approximate nearest neighbors ...")
     }
@@ -338,7 +338,7 @@ optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_w
         if(verbose) {
             print(paste0('testing k:', k, ' ...'))
         }
-        getKnnMembership(mat, k, details=TRUE)
+        getComMembership(mat, k, details=TRUE)
     })
     mods <- sapply(results, function(x) x$mod)
     i <- which(mods==max(mods))
@@ -351,7 +351,7 @@ optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_w
 ## When there are too many cells, getKNNMembership runs into memory issues
 ## Also just takes too long
 ## Need subsampling
-getApproxKnnMembership <- function(mat, k1, k2, nsubsample=ncol(mat)*0.75, method=igraph::cluster_walktrap, seed=0, verbose=TRUE) {
+getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igraph::cluster_walktrap, seed=0, verbose=TRUE) {
 
     if(verbose) {
         print(paste0('Subsampling from ', ncol(mat), ' cells to ', nsubsample, ' ... '))
@@ -365,18 +365,17 @@ getApproxKnnMembership <- function(mat, k1, k2, nsubsample=ncol(mat)*0.75, metho
         print('Identifying cluster membership for subsample ... ')
     }
     pcs.sub <- mat[, subsample]
-    com.sub <- getKnnMembership(pcs.sub, k=k1, method=method)
-
-    data <- mat[, subsample]
-    query <- pcs[, setdiff(colnames(mat), subsample)]
-    knn <- RANN::nn2(t(data), t(query), k=k2)[[1]]
-    rownames(knn) <- colnames(query)
+    com.sub <- getComMembership(pcs.sub, k=k, method=method)
 
     if(verbose) {
         print('Imputing cluster membership for rest of cells ... ')
     }
 
     ## Use neighbor voting
+    ## data <- mat[, subsample]
+    ## query <- mat[, setdiff(colnames(mat), subsample)]
+    ## knn <- RANN::nn2(t(data), t(query), k=k2)[[1]]
+    ## rownames(knn) <- colnames(query)
     ## com.nonsub <- unlist(apply(knn, 1, function(x) {
     ##         ## nearest neighbors in data
     ##         nn <- colnames(data)[x]
@@ -391,7 +390,7 @@ getApproxKnnMembership <- function(mat, k1, k2, nsubsample=ncol(mat)*0.75, metho
     ## Inspired by DenSVM
     df.sub <- data.frame(celltype=com.sub, t(pcs.sub))
     model <- MASS::lda(celltype ~ ., data=df.sub)
-    df.all <- data.frame(t(pcs))
+    df.all <- data.frame(t(mat))
     model.output <- predict(model, df.all)
     com.all <- model.output$class
     names(com.all) <- rownames(df.all)
