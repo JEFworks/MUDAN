@@ -31,9 +31,11 @@ Mudan <- R6::R6Class(
         ncores = NULL,
 
         pcs = NULL,
+        lds = NULL,
         com = NULL,
         model = NULL,
         emb = NULL,
+
 
         initialize =
             function(name = NA, counts = NA, verbose = TRUE, ncores=10, ...)
@@ -64,28 +66,40 @@ Mudan <- R6::R6Class(
             },
 
         communityDetection =
-            function(communityName, communityMethod, minSize=5, ...)
+            function(reductionType='pcs', communityName="Infomap", communityMethod=igraph::cluster_infomap, k=30, minSize=5, ...)
             {
-                com <- getComMembership(self$pcs, method=communityMethod, ...)
+                com <- getComMembership(self[[reductionType]], method=communityMethod, k=k, ...)
 
                 min.group.size <- minSize
                 bad.groups <- names(which(table(com) < min.group.size))
                 com[com %in% bad.groups] <- NA
 
-                self$com[[communityName]] <- com
+                com <- factor(com)
+
+                self$com[[reductionType]][[communityName]] <- com
             },
 
         modelCommunity =
-            function(nGenes=1000, communityName=1, ...)
+            function(nGenes=1000, communityName=NULL, ...)
             {
+
                 vargenes <- getVariableGenes(self$matnorm, nGenes)
-                self$model <- modelLda(self$mat[vargenes,], self$com[[communityName]], ...)
+                ## test all coms
+                if(is.null(communityName)) {
+                    self$model <- lapply(self$com[['pcs']], function(c) {
+                                             model <- modelLda(mat=self$mat[vargenes,], com=c)
+                                         })
+                } else {
+                    self$model <- modelLda(self$mat[vargenes,], self$com[['pcs']][[communityName]], ...)
+                }
             },
 
         getMudanEmbedding =
             function(communityName = 1, ...)
             {
-                self$emb[['MUDAN']] <- tsneLda(mat=self$mat, model=self$model, com=self$com[[communityName]], ...)
+                results <- tsneLda(mat=self$mat, model=self$model, com=self$com[['pcs']][[communityName]], details=TRUE, ...)
+                self$lds <- t(results$reduction)
+                self$emb[['MUDAN']] <- results$emb
             },
 
         getStandardEmbedding =
@@ -98,15 +112,15 @@ Mudan <- R6::R6Class(
                     if(do.par) {
                         par(mar = c(0.5,0.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
                     }
-                    plotEmbedding(pcs.emb, groups=self$com, ...)
+                    plotEmbedding(pcs.emb, ...)
                 }
 
             },
 
         plot =
-            function(communityName, embeddingType, ...)
+            function(reductionType, communityName, embeddingType, ...)
             {
-                plotEmbedding(self$emb[[embeddingType]], groups=self$com[[communityName]], ...)
+                plotEmbedding(self$emb[[embeddingType]], groups=self$com[[reductionType]][[communityName]], ...)
             }
     )
 )

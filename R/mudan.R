@@ -593,7 +593,7 @@ getDifferentialGenes <- function(mat, com, upregulated.only=TRUE, z.threshold=3,
 ##'
 ##' @export
 ##'
-tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=TRUE, ...) {
+tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=FALSE, ...) {
     if(verbose) {
         print('Running LDA models ...')
     }
