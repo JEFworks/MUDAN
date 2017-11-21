@@ -80,24 +80,27 @@ Mudan <- R6::R6Class(
             },
 
         modelCommunity =
-            function(nGenes=1000, communityName=NULL, ...)
+            function(nGenes=1000, groups=NULL, communityName=NULL, ...)
             {
-
                 vargenes <- getVariableGenes(self$matnorm, nGenes)
                 ## test all coms
-                if(is.null(communityName)) {
-                    self$model <- lapply(self$com[['pcs']], function(c) {
-                                             model <- modelLda(mat=self$mat[vargenes,], com=c)
-                                         })
+                if(is.null(groups)) {
+                    if(is.null(communityName)) {
+                        self$model <- lapply(self$com[['pcs']], function(c) {
+                                                 model <- modelLda(mat=self$mat[vargenes,], com=c)
+                                             })
+                    } else {
+                        self$model <- modelLda(self$mat[vargenes,], self$com[['pcs']][[communityName]], ...)
+                    }
                 } else {
-                    self$model <- modelLda(self$mat[vargenes,], self$com[['pcs']][[communityName]], ...)
+                    self$model <- modelLda(self$mat[vargenes,], groups, ...)
                 }
             },
 
         getMudanEmbedding =
-            function(communityName = 1, ...)
+            function(...)
             {
-                results <- tsneLda(mat=self$mat, model=self$model, com=self$com[['pcs']][[communityName]], details=TRUE, ...)
+                results <- tsneLda(mat=self$mat, model=self$model, details=TRUE, ...)
                 self$lds <- t(results$reduction)
                 self$emb[['MUDAN']] <- results$emb
             },
@@ -118,9 +121,13 @@ Mudan <- R6::R6Class(
             },
 
         plot =
-            function(reductionType, communityName, embeddingType, ...)
+            function(reductionType, groups=NULL, communityName, embeddingType, ...)
             {
-                plotEmbedding(self$emb[[embeddingType]], groups=self$com[[reductionType]][[communityName]], ...)
+                if(is.null(groups)) {
+                    plotEmbedding(self$emb[[embeddingType]], groups=self$com[[reductionType]][[communityName]], ...)
+                } else {
+                  plotEmbedding(self$emb[[embeddingType]], groups=groups, ...)
+                }
             }
     )
 )
