@@ -563,7 +563,11 @@ markerAuc <- function(x, y) {
     return(auc)
 }
 ## calls on getClusterGeneInfo, filtering results
-getDifferentialGenes <- function(mat, com, upregulated.only=TRUE, z.threshold=3, auc.threshold=0.5, fe.threshold=0.5, M.threshold=0.1, verbose=TRUE, ncores=10) {
+getDifferentialGenes <- function(mat, com, nGenes = min(nrow(mat), 1000), upregulated.only=TRUE, z.threshold=3, auc.threshold=0.5, fe.threshold=0.5, M.threshold=0.1, verbose=TRUE, ncores=10) {
+    ## get top variable genes to limit search space
+    vgenes <- getVariableGenes(mat, nGenes)
+    mat <- mat[vgenes,]
+
     ## get info
     df.info <- df.list <- getClusterGeneInfo(mat, com, verbose, ncores)
 
@@ -593,7 +597,7 @@ getDifferentialGenes <- function(mat, com, upregulated.only=TRUE, z.threshold=3,
 ##'
 ##' @export
 ##'
-tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=FALSE, ...) {
+tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=FALSE, ...) {
     if(verbose) {
         print('Running LDA models ...')
     }
@@ -621,7 +625,7 @@ tsneLda <- function(mat, model, com, perplexity=30, verbose=TRUE, plot=TRUE, do.
         if(do.par) {
             par(mar = c(0.5,0.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
         }
-        plotEmbedding(emb, groups=com, ...)
+        plotEmbedding(emb, ...)
     }
 
     if(details) {
@@ -647,6 +651,7 @@ plotEmbedding <- function(emb, groups=NULL, colors=NULL, do.par=TRUE, cex=0.6, a
         if(all(areColors(colors))) {
             if(verbose) cat("using supplied colors as is\n")
             cols <- colors[match(rownames(emb),names(colors))]; cols[is.na(cols)] <- unclassified.cell.color;
+            names(cols) <- rownames(emb)
         } else {
             if(is.numeric(colors)) { # treat as a gradient
                 if(verbose) cat("treating colors as a gradient")
@@ -676,6 +681,7 @@ plotEmbedding <- function(emb, groups=NULL, colors=NULL, do.par=TRUE, cex=0.6, a
                 if(verbose) cat(' with zlim:',zlim,'\n')
                 colors <- (colors-zlim[1])/(zlim[2]-zlim[1])
                 cols <- gradientPalette[colors[match(rownames(emb),names(colors))]*(length(gradientPalette)-1)+1]
+                names(cols) <- rownames(emb)
             } else {
                 stop("colors argument must be a cell-named vector of either character colors or numeric values to be mapped to a gradient")
             }
@@ -689,9 +695,12 @@ plotEmbedding <- function(emb, groups=NULL, colors=NULL, do.par=TRUE, cex=0.6, a
             ## set up a rainbow color on the factor
             factor.colors <- fac2col(groups,s=s,v=v,shuffle=shuffle.colors,min.group.size=min.group.size,unclassified.cell.color=unclassified.cell.color,level.colors=group.level.colors,return.details=T)
             cols <- factor.colors$colors;
+            names(cols) <- rownames(emb)
+        } else {
+          cols <- rep(unclassified.cell.color, nrow(emb))
+          names(cols) <- rownames(emb)
         }
     }
-    names(cols) <- rownames(emb)
 
     if(do.par) {
         par(mar = c(0.5,0.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
