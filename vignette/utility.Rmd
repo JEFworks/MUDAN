@@ -1,0 +1,179 @@
+---
+title: "Demonstrating the Utility of MUDAN"
+author: "Jean Fan"
+date: '`r Sys.Date()`'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(
+    warning = FALSE,
+    message = FALSE,
+    fig.path = 'figure/',
+    cache.path = 'cache/',
+    cache = TRUE,
+    dev = 'png',
+    dpi=100, fig.width=6, fig.height=3
+)
+```
+
+To demonstrate the utility of `MUDAN`, we will analyze [two 10X PBMC datasets from Zheng et al](https://support.10xgenomics.com/single-cell-gene-expression/datasets).
+
+The data are already provided to you as counts matrices. We will load and subsample the data.
+
+```{r}
+library(MUDAN)
+data("pbmcA")
+data("pbmcB")
+print(dim(pbmcA))
+print(dim(pbmcB))
+set.seed(0)
+## subsample cells for smaller dataset to run faster
+vi <- sample(colnames(pbmcA), 2000)
+pbmcA <- pbmcA[, vi]
+vi <- sample(colnames(pbmcB), 2000)
+pbmcB <- pbmcB[, vi]
+```
+
+First, we will combine the two datasets without batch correction and perform regular dimensionality reduction with PCA and visualization with tSNE. 
+
+```{r}
+## filter and combine
+v1 <- rownames(pbmcA)[rowSums(pbmcA)>0]
+v2 <- rownames(pbmcB)[rowSums(pbmcB)>0]
+genes.int <- intersect(v1, v2)
+length(genes.int)
+cd <- cbind(pbmcA[genes.int,], pbmcB[genes.int,])
+group <- factor(colnames(cd) %in% colnames(pbmcA), labels=c('pbmcA', 'pbmcB'))
+names(group) <- colnames(cd)
+
+## see separation by batch if we cluster all together
+myMudanObject <- Mudan$new("comb", cd, ncores=4)
+myMudanObject$libSizeNormalize()
+myMudanObject$varianceNormalize(plot=FALSE)
+myMudanObject$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
+myMudanObject$getStandardEmbedding(plot=FALSE)
+plotEmbedding(myMudanObject$emb[['PCA']], groups=group, main="comb PCA", show.legend=TRUE)
+```
+
+Indeed, we see prominent batch/patient differences. Traditionally, we would normalize out batch specific differences with batch correction using as using `combat`. 
+
+```{r}
+## apply combat batch correction
+library(sva)
+myMudanObjectbc <- Mudan$new("combbc", cd, ncores=4)
+myMudanObjectbc$libSizeNormalize()
+myMudanObjectbc$varianceNormalize(plot=FALSE)
+cdbc <- sva::ComBat(dat=as.matrix(myMudanObjectbc$matnorm), batch=group[colnames(myMudanObjectbc$matnorm)]) ## remove batch effect
+myMudanObjectbc$matnorm <- cdbc
+myMudanObjectbc$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
+myMudanObjectbc$getStandardEmbedding(plot=FALSE)
+plotEmbedding(myMudanObjectbc$emb[['PCA']], groups=group, main="comb batch normalized PCA", show.legend=TRUE)
+```
+
+However, we will show later that this batch correction "over-corrects", removing true biological signal and obscures our ability to identify the appropriate cell subtypes. 
+
+Let's first analyze each dataset separately.
+
+```{r}
+## analyze pbmcA by itself
+myMudanObject1 <- Mudan$new("pbmcA", pbmcA, ncores=4)
+myMudanObject1$libSizeNormalize()
+myMudanObject1$varianceNormalize(plot=FALSE)
+myMudanObject1$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
+myMudanObject1$getStandardEmbedding(plot=FALSE)
+myMudanObject1$communityDetection(reductionType='pcs', communityName="Infomap", communityMethod=igraph::cluster_infomap, k=30)
+myMudanObject1$modelCommunity(communityName="Infomap")
+myMudanObject1$getMudanEmbedding(plot=FALSE)
+par(mfrow=c(1,2))
+myMudanObject1$plot(reductionType='pcs', communityName="Infomap", embeddingType="PCA", main='pbmcA PCA', show.legend=TRUE)
+myMudanObject1$plot(reductionType='pcs', communityName="Infomap", embeddingType="MUDAN", main='pbmcA MUDAN', show.legend=TRUE)
+```
+
+```{r}
+## analyze pbmcB by itself
+myMudanObject2 <- Mudan$new("pbmcB", pbmcB, ncores=4)
+myMudanObject2$libSizeNormalize()
+myMudanObject2$varianceNormalize(plot=FALSE)
+myMudanObject2$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
+myMudanObject2$getStandardEmbedding(plot=FALSE)
+myMudanObject2$communityDetection(reductionType='pcs', communityName="Infomap", communityMethod=igraph::cluster_infomap, k=30)
+myMudanObject2$modelCommunity(communityName="Infomap")
+myMudanObject2$getMudanEmbedding(plot=FALSE)
+par(mfrow=c(1,2))
+myMudanObject2$plot(reductionType='pcs', communityName="Infomap", embeddingType="PCA", main='pbmcB PCA', show.legend=TRUE)
+myMudanObject2$plot(reductionType='pcs', communityName="Infomap", embeddingType="MUDAN", main='pbmcB MUDAN', show.legend=TRUE)
+```
+
+Now, we will learn from each dataset analyzed individually and project the combined dataset.
+
+```{r}
+## project and combine (need to clean up into function)
+v1 <- rownames(pbmcA)[rowSums(pbmcA)>30]
+v2 <- rownames(pbmcB)[rowSums(pbmcB)>30]
+genes.int <- intersect(v1, v2)
+length(genes.int)
+m1 <- as.matrix(myMudanObject1$mat[genes.int,])
+m2 <- as.matrix(myMudanObject2$mat[genes.int,])
+mall <- cbind(m1, m2)
+combat <- sva::ComBat(dat=mall, batch=group[colnames(mall)]) ## remove batch effect
+m1c <- combat[, colnames(m1)]
+m2c <- combat[, colnames(m2)]
+## maximize axis of separation
+nGenes <- 500
+vargenes <- getVariableGenes(myMudanObject1$matnorm[genes.int,], nGenes)
+model1 <- modelLda(mat=m1c[vargenes,], com=myMudanObject1$com[['pcs']][['Infomap']])
+vargenes <- getVariableGenes(myMudanObject2$matnorm[genes.int,], nGenes)
+model2 <- modelLda(mat=m2c[vargenes,], com=myMudanObject2$com[['pcs']][['Infomap']])
+## project
+lds1 <- predict(model1, data.frame(t(combat)))$x
+lds2 <- predict(model2, data.frame(t(combat)))$x
+## get embedding on projections
+reduction <- cbind(lds1, lds2)
+emb <- Rtsne::Rtsne(reduction, is_distance=FALSE, perplexity=60, verbose=TRUE, num_threads=2)$Y
+rownames(emb) <- rownames(reduction)
+## look at new embedding with old annotations
+par(mfrow=c(1,2))
+plotEmbedding(emb, groups=myMudanObject1$com[['pcs']][['Infomap']], show.legend=TRUE, main='annotations from pbmcA only analysis')
+plotEmbedding(emb, groups=myMudanObject2$com[['pcs']][['Infomap']], show.legend=TRUE, main='annotations from pbmcB only analysis')
+```
+
+We can get new annotations from the projection and compare with our previous results.
+
+```{r}
+## get new annotation
+com <- getComMembership(t(reduction), k=100, method=igraph::cluster_infomap)
+par(mfrow=c(1,3))
+plotEmbedding(emb, groups=com)
+plotEmbedding(myMudanObject1$emb[['PCA']], groups=com[rownames(myMudanObject1$emb[['PCA']])])
+plotEmbedding(myMudanObject2$emb[['PCA']], groups=com[rownames(myMudanObject2$emb[['PCA']])])
+## plot all together
+par(mfrow=c(1,2))
+myMudanObject1$plot(reductionType='pcs', communityName="Infomap", embeddingType="PCA", main='pbmcA ind')
+plotEmbedding(myMudanObject1$emb[['PCA']], groups=com[rownames(myMudanObject1$emb[['PCA']])], main='pbmcA comb')
+myMudanObject2$plot(reductionType='pcs', communityName="Infomap", embeddingType="PCA", main='pbmcB ind')
+plotEmbedding(myMudanObject2$emb[['PCA']], groups=com[rownames(myMudanObject2$emb[['PCA']])], main='pbmcB comb')
+## some groups more prominent in pbmcB now separated in pbmcA and vice versa
+par(mfrow=c(1,2))
+plotEmbedding(emb, groups=com, main="comb MUDAN", show.legend=TRUE)
+plotEmbedding(emb, groups=group, main="comb MUDAN", show.legend=TRUE)
+plotEmbedding(myMudanObject$emb[['PCA']], groups=com, main="comb PCA", show.legend=TRUE)
+plotEmbedding(myMudanObject$emb[['PCA']], groups=group, main="comb PCA", show.legend=TRUE)
+plotEmbedding(myMudanObjectbc$emb[['PCA']], groups=com, main="batch corrected comb PCA", show.legend=TRUE)
+plotEmbedding(myMudanObjectbc$emb[['PCA']], groups=group, main="batch corrected comb PCA", show.legend=TRUE)
+```
+
+Replot with shuffled colors.
+
+```{r}
+par(mfrow=c(1,3))
+plotEmbedding(emb, groups=com, main="comb MUDAN", shuffle.colors=TRUE)
+plotEmbedding(myMudanObject$emb[['PCA']], groups=com, main="comb PCA", shuffle.colors=TRUE)
+plotEmbedding(myMudanObjectbc$emb[['PCA']], groups=com, main="batch corrected comb PCA", shuffle.colors=TRUE)
+```
+
+
+
