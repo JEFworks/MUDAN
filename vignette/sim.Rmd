@@ -1,0 +1,108 @@
+---
+title: "Individual Sample Analysis"
+author: "Jean Fan"
+date: '`r Sys.Date()`'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(
+    warning = FALSE,
+    message = FALSE,
+    fig.path = 'figure/',
+    cache.path = 'cache/',
+    cache = TRUE,
+    dev = 'png',
+    dpi=100, fig.width=6, fig.height=3
+)
+```
+
+To demonstrate the utility of `MUDAN` for analysis of an individual sample, we will use simulated data to show how poor signal can be strengthened by graph-based community detection. 
+
+Let's begin by simulating some data where we have 5 different cell types / groups.
+
+```{r}
+library(MUDAN)
+
+## simulate data
+simulate.data <- function(G=5, N=100, M=1000, initmean=0, initvar=10, upreg=1, upregvar=15, ng=10, ng2=20, seed=0, plot=TRUE) {
+  set.seed(seed)
+  mat <- matrix(rnorm(N*M*G, initmean, initvar), M, N*G)
+  rownames(mat) <- paste0('gene', 1:M)
+  colnames(mat) <- paste0('cell', 1:(N*G))
+  group <- factor(sapply(1:G, function(x) rep(paste0('group', x), N)))
+  names(group) <- colnames(mat)
+  
+  ## unique diff genes
+  diff <- lapply(1:G, function(x) {
+    diff <- rownames(mat)[(((x-1)*ng)+1):(((x-1)*ng)+ng)]
+    mat[diff, group==paste0('group', x)] <<- mat[diff, group==paste0('group', x)] + rnorm(ng, upreg, upregvar)
+    return(diff)
+  })
+  names(diff) <- paste0('group', 1:G)
+  
+  ## shared subpops
+  diff2 <- lapply(2:(G-1), function(x) {
+    y <- x+G
+    diff <- rownames(mat)[(((y-1)*ng2)+1):(((y-1)*ng2)+ng2)]
+    mat[diff, group %in% paste0("group", 1:x)] <<- mat[diff, group %in% paste0("group", 1:x)] + rnorm(ng2, upreg, upregvar)
+    return(diff)
+  })
+  
+  mat[mat<0] <- 0
+  mat <- round(mat)
+  
+  if(plot) {
+    heatmap(mat, Rowv=NA, Colv=NA, col=colorRampPalette(c('blue', 'white', 'red'))(100), scale="none", ColSideColors=rainbow(G)[group], labCol=FALSE, labRow=FALSE)
+  }
+  
+  return(list(mat=mat, group=group))
+}
+
+data <- simulate.data()
+```
+
+First, we will use a conventional PCA dimensionality approach followed by tSNE. What we get is a fuzzy blob. 
+
+```{r}
+myMudanObject <- Mudan$new("sim", data$mat, ncores=4)
+myMudanObject$libSizeNormalize()
+myMudanObject$varianceNormalize(plot=FALSE)
+myMudanObject$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
+myMudanObject$getStandardEmbedding(plot=FALSE)
+
+## PCA-based approach
+plotEmbedding(myMudanObject$emb[['PCA']], groups=data$group, main="comb PCA")
+```
+
+Now we will use various graph-based community detection approaches to identify potential groups and the corresponding lower-dimensional space that can capture this group-separability. We will run tSNE on these lower-dimensional spaces corresponding to each set of identified groups.
+
+```{r}
+## community detection
+myMudanObject$communityDetection(reductionType='pcs', communityName="Walktrap5", communityMethod=igraph::cluster_walktrap, k=5)
+myMudanObject$communityDetection(reductionType='pcs', communityName="Walktrap10", communityMethod=igraph::cluster_walktrap, k=10)
+myMudanObject$communityDetection(reductionType='pcs', communityName="Walktrap20", communityMethod=igraph::cluster_walktrap, k=20)
+
+## use all communities detected
+myMudanObject$modelCommunity()
+myMudanObject$getMudanEmbedding(plot=FALSE)
+plotEmbedding(myMudanObject$emb[['MUDAN']], groups=data$group, main="MUDAN")
+```
+
+We are able to much more clearly visually identify our original groups, even without prior knowledge of the groups. 
+
+In theory, if we wanted to simply visualize known groups, we can also provide those group labels to identify a corresponding lower-dimensional space that can capture this group-separability. 
+
+```{r}
+myMudanObjectb <- Mudan$new("biased", data$mat, ncores=4)
+myMudanObjectb$libSizeNormalize()
+myMudanObjectb$varianceNormalize(plot=FALSE)
+myMudanObjectb$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
+## use known groups rather than unbiased detection from graph-based approaches
+myMudanObjectb$modelCommunity(groups=data$group)
+myMudanObjectb$getMudanEmbedding(plot=FALSE)
+plotEmbedding(myMudanObjectb$emb[['MUDAN']], groups=data$group, main="biased MUDAN")
+```
