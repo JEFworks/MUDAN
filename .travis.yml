@@ -26,7 +26,7 @@ r_github_packages:
 
 # install GSL for Rfast
 before_install:
-  - sudo apt-get install libgsl0ldbl
+  - sudo apt-get install gsl-doc-info gsl-doc-pdf gsl-ref-html gsl-ref-psdoc gsl-bin libgsl0-dev
 
 # we need to install BiocInstaller for testing Bioconductor packages
 bioc_required: true
