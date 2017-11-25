@@ -2,3 +2,8 @@
 .Rproj.user
 .Rbuildignore
 *.Rproj
+.RData
+.Rhistory
+
+vignette/cache/
+vignette/figure/

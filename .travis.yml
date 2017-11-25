@@ -24,10 +24,9 @@ r_check_args: --no-build-vignettes --no-manual --timings
 r_github_packages:
   - JEFworks/MUDAN
 
-# install jags
+# install GSL for Rfast
 before_install:
-  - sudo apt-get install jags
-  - sudo apt-get install r-cran-rjags
+  - sudo apt-get install libgsl0ldbl
 
 # we need to install BiocInstaller for testing Bioconductor packages
 bioc_required: true
@@ -35,7 +34,7 @@ bioc_required: true
 # only report coverage for the release version
 after_success:
   - test $TRAVIS_R_VERSION_STRING = 'release' && Rscript -e 'covr::codecov()'
-  
+
 notifications:
   email:
     on_success: change

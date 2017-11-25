@@ -38,10 +38,10 @@ Mudan <- R6::R6Class(
 
 
         initialize =
-            function(name = NA, counts = NA, verbose = TRUE, ncores=10, ...)
+            function(name = NA, counts = NA, verbose = TRUE, ncores=1, ...)
             {
                 self$name <- name
-                self$counts <- cleanCounts(as.matrix(counts), ...)
+                self$counts <- cleanCounts(counts, ...)
                 self$verbose <- verbose
                 self$ncores <- ncores
             },
@@ -80,7 +80,7 @@ Mudan <- R6::R6Class(
             },
 
         modelCommunity =
-            function(nGenes=1000, groups=NULL, communityName=NULL, ...)
+            function(nGenes=min(1000, nrow(self$matnorm)*0.5), groups=NULL, communityName=NULL, ...)
             {
                 vargenes <- getVariableGenes(self$matnorm, nGenes)
                 ## test all coms
