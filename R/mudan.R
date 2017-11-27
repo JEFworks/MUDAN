@@ -562,11 +562,123 @@ markerAuc <- function(x, y) {
     auc <- perf@y.values[[1]]
     return(auc)
 }
-## calls on getClusterGeneInfo, filtering results
-getDifferentialGenes <- function(mat, com, nGenes = min(nrow(mat), 1000), upregulated.only=TRUE, z.threshold=3, auc.threshold=0.5, fe.threshold=0.5, M.threshold=0.1, verbose=TRUE, ncores=10) {
-    ## get top variable genes to limit search space
-    vgenes <- getVariableGenes(mat, nGenes)
-    mat <- mat[vgenes,]
+
+getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
+
+  ## match matrix rownames (cells) and group annotations
+  if(!all(rownames(cm) %in% names(cols))) { warning("Cluster vector doesn't specify groups for all of the cells, dropping missing cells from comparison")}
+  ## determine a subset of cells that's in the cols and cols[cell]!=NA
+  valid.cells <- rownames(cm) %in% names(cols)[!is.na(cols)];
+  if(!all(valid.cells)) {
+    ## take a subset of the count matrix
+    cm <- cm[valid.cells,]
+  }
+  ## reorder cols
+  cols <- as.factor(cols[match(rownames(cm),names(cols))]);
+  cols <- as.factor(cols);
+
+  if(verbose) {
+    print(paste0("Running differential expression with ",length(levels(cols))," clusters ... "))
+  }
+
+  ## modified from pagoda2
+  # run wilcoxon test comparing each group with the rest
+  # calculate rank per column (per-gene) average rank matrix
+  xr <- apply(cm, 2, function(foo) {
+    #foo[foo==0] <- NA
+    bar <- Rfast::Rank(foo)
+    #bar[is.na(foo)] <- 0
+    bar[foo==0] <- 0
+    bar
+  }); rownames(xr) <- rownames(cm)
+  range(xr[,1])
+  xr[1:5,1:5]
+  cm[1:5,1:5]
+  ##xr <- sparse_matrix_column_ranks(cm);
+
+  # calculate rank sums per group
+  grs <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(xr[cols==g,])))
+  rownames(grs) <- levels(cols); colnames(grs) <- colnames(xr)
+  grs[1:5,1:5]
+  ##grs <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
+
+  # calculate number of non-zero entries per group
+  gnzz <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(xr[cols==g,]>0)))
+  rownames(gnzz) <- levels(cols); colnames(gnzz) <- colnames(xr)
+  gnzz[1:5,1:5]
+  #xr@x <- numeric(length(xr@x))+1
+  #gnzz <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
+
+  #group.size <- as.numeric(tapply(cols,cols,length));
+  #group.size <- as.numeric(tapply(cols,cols,length))[1:nrow(gnzz)]; group.size[is.na(group.size)]<-0; # trailing empty levels are cut off by colSumByFac
+  group.size <- as.numeric(table(cols))
+
+  # add contribution of zero entries to the grs
+  gnz <- (group.size-gnzz)
+
+  # rank of a 0 entry for each gene
+  #zero.ranks <- (nrow(xr)-diff(xr@p)+1)/2 # number of total zero entries per gene
+  zero.ranks <- apply(cm, 2, function(foo) {
+    bar <- Rfast::Rank(foo)
+    bar[foo==0][1]
+  })
+  ustat <- t((t(gnz)*zero.ranks)) + grs - group.size*(group.size+1)/2
+
+  # standardize
+  n1n2 <- group.size*(nrow(cm)-group.size);
+  # usigma <- sqrt(n1n2*(nrow(cm)+1)/12) # without tie correction
+  # correcting for 0 ties, of which there are plenty
+  #usigma <- sqrt(n1n2*(nrow(cm)+1)/12)
+  usigma <- sqrt((nrow(cm) +1 - (gnz^3 - gnz)/(nrow(cm)*(nrow(cm)-1)))*n1n2/12)
+  # standardized U value- z score
+  x <- t((ustat - n1n2/2)/usigma);
+
+  # correct for multiple hypothesis
+  x <- matrix(qnorm(bh.adjust(pnorm(as.numeric(abs(x)), lower.tail = FALSE,
+                                    log.p = TRUE), log = TRUE), lower.tail = FALSE, log.p = TRUE),
+              ncol = ncol(x)) * sign(x)
+  rownames(x) <- colnames(cm)
+  colnames(x) <- levels(cols)[1:ncol(x)]
+
+  # add fold change information
+  log.gene.av <- log2(Rfast::colmeans(cm));
+  group.gene.av <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(cm[cols==g,]>0))) / (group.size+1);
+  log2.fold.change <- log2(t(group.gene.av)) - log.gene.av;
+  # fraction of cells expressing
+  f.expressing <- t(gnzz / group.size);
+  max.group <- max.col(log2.fold.change)
+
+  if(verbose) {
+    print("Summarizing results ... ")
+  }
+
+  ## sumarize
+  ds <- lapply(1:ncol(x),function(i) {
+    r <- data.frame(Z=x[,i],M=log2.fold.change[,i],highest=max.group==i,fe=f.expressing[,i])
+    rownames(r) <- rownames(x)
+    r
+  })
+  names(ds)<-colnames(x)
+
+  return(ds)
+}
+
+## diffGenes is output of getDifferentialGenes
+getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.threshold=3, auc.threshold=0.5, fe.threshold=0.5, M.threshold=0.1, verbose=TRUE, ncores=1) {
+
+    if(is.null(diffGenes)) {
+        ds <- getDifferentialGenes(mat, com)
+    } else {
+        ds <- diffGenes
+    }
+
+    if(upregulatedOnly) {
+        dg <- unique(unlist(lapply(ds, function(x) rownames(x)[x$Z>z.threshold])))
+    } else {
+        dg <- unique(unlist(lapply(ds, function(x) rownames(x)[abs(x$Z)>z.threshold])))
+    }
+    dg <- intersect(dg, rownames(mat))
+    mat <- mat[dg,]
 
     ## get info
     df.info <- df.list <- getClusterGeneInfo(mat, com, verbose, ncores)
@@ -591,7 +703,105 @@ getDifferentialGenes <- function(mat, com, nGenes = min(nrow(mat), 1000), upregu
     ))
 }
 
+getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.6, verbose=TRUE, plot=TRUE) {
+  if(verbose) {
+    print(paste0('Feature selection for ', length(levels(cols)), ' groups with Z threshold ', z.threshold))
+  }
 
+  ## feature selection
+  ds <- getDifferentialGenes(cm, cols, verbose=verbose)
+  diff.genes <- lapply(ds, function(x) rownames(x)[abs(x$Z)>1.96 & x$highest])
+  #lapply(diff.genes, length)
+  ## visualize
+  #lapply(diff.genes, function(dg) {
+  #  dg <- intersect(dg, colnames(cm))
+  #  m <- Rfast::rowsums(cm[,dg]>0)
+  #  names(m) <- rownames(cm)
+  #  plotEmbedding(myMudanObject1$emb[['PCA']], colors=m)
+  #})
+
+  diff.genes <- unique(unlist(diff.genes))
+  diff.genes <- intersect(diff.genes, colnames(cm))
+  length(diff.genes)
+
+  ## assess accuracy
+  set.seed(0)
+  cells <- rownames(cm); folds <- split(cells, ceiling(seq_along(cells)/(length(cells)/fc)))
+  #lapply(folds, length)
+
+  ## subsample
+  #set.seed(0)
+  #train <- sample(rownames(cm), nrow(cm)*0.5)
+  #test <- setdiff(rownames(cm), train)
+
+  preds <- lapply(folds, function(train) {
+    test <- setdiff(rownames(cm), train)
+    df <- data.frame(celltype=cols, as.matrix(cm[, diff.genes]))
+    ## model
+    model <- MASS::lda(celltype ~ ., data=df[train,])
+    ## predict
+    model.output <- predict(model, df[test,])
+    pred <- model.output$class
+    names(pred) <- test
+    return(pred)
+  })
+  preds <- unlist(preds)
+  names(preds) <- sub('*.[.]','',names(preds))
+  #head(preds)
+
+  # ## assess accuracy
+  # acc <- sapply(levels(cols), function(g) {
+  #   #print(g)
+  #   vi <- names(preds)[cols[names(preds)]==g]
+  #   #print(table(preds[vi]))
+  #   acc <- table(preds[vi]==cols[vi])
+  #   acc <- acc[c('TRUE', 'FALSE')]
+  #   names(acc) <- c('TRUE', 'FALSE')
+  #   acc[is.na(acc)] <- 0
+  #
+  #   if(acc['TRUE']/sum(acc) < 0.5) {
+  #     foo = table(preds[vi])
+  #     foo = foo[-which(names(foo)==g)]
+  #     print(paste0('May want to merge ', g , ' with ', names(sort(foo, decreasing=TRUE)[1])))
+  #   }
+  #
+  #   return(acc['TRUE']/sum(acc))
+  # })
+  # names(acc) <- levels(cols)
+  # print(acc)
+
+  ## automerge
+  newlevels <- sapply(levels(cols), function(g) {
+    #print(g)
+    vi <- names(preds)[cols[names(preds)]==g]
+    #print(table(preds[vi]))
+    acc <- table(preds[vi]==cols[vi])
+    acc <- acc[c('TRUE', 'FALSE')]
+    names(acc) <- c('TRUE', 'FALSE')
+    acc[is.na(acc)] <- 0
+
+    if(acc['TRUE']/sum(acc) < t) {
+      foo = table(preds[vi])
+      foo = foo[-which(names(foo)==g)]
+      ng = names(sort(foo, decreasing=TRUE)[1])
+      print(paste0('Merging ', g , ' with ', ng))
+      return(ng)
+    } else {
+      return(g)
+    }
+  })
+
+  cols2 <- factor(cols, levels=names(newlevels), labels=newlevels)
+  cols2 <- factor(cols2)
+
+  if(plot) {
+    par(mfrow=c(1,2))
+    plotEmbedding(myMudanObject1$emb[['PCA']], groups=cols, main='Original', show.legend=TRUE, mark.clusters=TRUE)
+    plotEmbedding(myMudanObject1$emb[['PCA']], groups=cols2, main='Merged', show.legend=TRUE, mark.clusters=TRUE)
+  }
+
+  return(cols2)
+}
 
 ##' Run tSNE on LDs from model
 ##'
