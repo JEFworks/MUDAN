@@ -2,7 +2,7 @@
 ##'
 ##' Filter counts matrix based on gene and cell requirements
 ##'
-##' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
+##' @param counts A sparse read count matrix. The rows correspond to genes, columns correspond to individual cells
 ##' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)
 ##' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
 ##' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
@@ -20,29 +20,29 @@
 ##'
 ##' @export
 ##'
-cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.reads = 1, min.detected = 1, verbose=TRUE) {
-    if(class(counts)!='matrix') {
-        counts <- as.matrix(counts)
-    }
+cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 1, min.detected = 1, verbose=TRUE) {
+  if(class(counts)!="dgCMatrix") {
+    counts <- Matrix(counts, sparse=TRUE)
+  }
 
-    if(verbose) {
-        print(paste0('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...'))
-    }
+  if(verbose) {
+    print(paste0('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...'))
+  }
 
-    ## filter out low-gene cells
-    counts <- counts[, Rfast::colsums(counts)>min.lib.size]
-    ## filter out potential doublets
-    counts <- counts[, Rfast::colsums(counts)<max.lib.size]
-    ## remove genes that don't have many reads
-    counts <- counts[Rfast::rowsums(counts)>min.reads, ]
-    ## remove genes that are not seen in a sufficient number of cells
-    counts <- counts[Rfast::rowsums(counts>0)>min.detected, ]
+  ## filter out low-gene cells
+  counts <- counts[, Matrix::colSums(counts)>min.lib.size]
+  ## filter out potential doublets
+  counts <- counts[, Matrix::colSums(counts)<max.lib.size]
+  ## remove genes that don't have many reads
+  counts <- counts[Matrix::rowSums(counts)>min.reads, ]
+  ## remove genes that are not seen in a sufficient number of cells
+  counts <- counts[Matrix::rowSums(counts>0)>min.detected, ]
 
-    if(verbose) {
-        print(paste0('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
-    }
+  if(verbose) {
+    print(paste0('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
+  }
 
-    return(counts)
+  return(counts)
 }
 
 
@@ -64,22 +64,22 @@ cleanCounts <- function(counts, min.lib.size = 1000, max.lib.size = 8000, min.re
 ##' @export
 ##'
 normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
-    if(class(counts)!='matrix') {
-        counts <- as.matrix(counts)
-    }
-    if(verbose) {
-        print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
-    }
+  if(class(counts)!="dgCMatrix") {
+    counts <- Matrix(counts, sparse=TRUE)
+  }
+  if(verbose) {
+    print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
+  }
 
-    counts <- t(t(counts)/Rfast::colsums(counts))
-    counts <- counts*depthScale
+  counts <- t(t(counts)/Matrix::colSums(counts))
+  counts <- counts*depthScale
 
-    return(counts)
+  return(counts)
 }
 
 
 ##' Normalize gene expression variance relative to transcriptome-wide expectations
-##' (Modified from SCDE/PAGODA2 code; now uses Rfast)
+##' (Modified from SCDE/PAGODA2 code)
 ##'
 ##' Normalizes gene expression magnitudes to with respect to its ratio to the
 ##' transcriptome-wide expectation as determined by local regression on expression magnitude
@@ -108,95 +108,94 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 ##' @export
 ##'
 normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
-    if(class(cd)!='matrix') {
-        cd <- as.matrix(cd)
-    }
+  if(class(cd)!="dgCMatrix") {
+    cd <- Matrix(cd, sparse=TRUE)
+  }
 
-    mat <- t(cd) ## make rows as cells, cols as genes
+  mat <- t(cd) ## make rows as cells, cols as genes
 
+  if(verbose) {
+    print("Calculating variance fit ...")
+  }
+  dfm <- log(Matrix::colMeans(mat))
+  dfv <- log(apply(mat, 2, var))
+  names(dfm) <- names(dfv) <- colnames(mat)
+  df <- data.frame(m=dfm, v=dfv)
+
+  vi <- which(is.finite(dfv))
+
+  if(length(vi)<gam.k*1.5) { gam.k=1 } ## too few genes
+
+  if(gam.k<2) {
     if(verbose) {
-        print("Calculating variance fit ...")
+      print("Using lm ...")
     }
-    dfm <- log(Rfast::colmeans(mat))
-    dfv <- log(Rfast::colVars(mat))
-    names(dfm) <- names(dfv) <- colnames(mat)
-    df <- data.frame(m=dfm, v=dfv)
-
-    vi <- which(is.finite(dfv))
-
-    if(length(vi)<gam.k*1.5) { gam.k=1 } ## too few genes
-
-    if(gam.k<2) {
-        if(verbose) {
-            print("Using lm ...")
-        }
-        m <- lm(v ~ m, data = df[vi,])
-    } else {
-        if(verbose) {
-            print(paste0("Using gam with k=", gam.k, "..."))
-        }
-        fm <- as.formula(sprintf("v ~ s(m, k = %s)", gam.k))
-        m <- mgcv::gam(fm, data = df[vi,])
-    }
-    df$res <- -Inf;  df$res[vi] <- resid(m,type='response')
-    n.cells <- ncol(mat)
-    n.obs <- nrow(mat)
-    df$lp <- as.numeric(pf(exp(df$res),n.obs,n.obs,lower.tail=F,log.p=T))
-    df$lpa <- bh.adjust(df$lp,log=TRUE)
-    df$qv <- as.numeric(qchisq(df$lp, n.cells-1, lower.tail = FALSE,log.p=TRUE)/n.cells)
-
-    if(use.unadjusted.pvals) {
-        ods <- which(df$lp<log(alpha))
-    } else {
-        ods <- which(df$lpa<log(alpha))
-    }
+    m <- lm(v ~ m, data = df[vi,])
+  } else {
     if(verbose) {
-        print(paste0(length(ods), ' overdispersed genes ... ' ))
+      print(paste0("Using gam with k=", gam.k, "..."))
     }
+    fm <- as.formula(sprintf("v ~ s(m, k = %s)", gam.k))
+    m <- mgcv::gam(fm, data = df[vi,])
+  }
+  df$res <- -Inf;  df$res[vi] <- resid(m,type='response')
+  n.cells <- ncol(mat)
+  n.obs <- nrow(mat)
+  df$lp <- as.numeric(pf(exp(df$res),n.obs,n.obs,lower.tail=F,log.p=T))
+  df$lpa <- bh.adjust(df$lp,log=TRUE)
+  df$qv <- as.numeric(qchisq(df$lp, n.cells-1, lower.tail = FALSE,log.p=TRUE)/n.cells)
 
-    df$gsf <- geneScaleFactors <- sqrt(pmax(min.adjusted.variance,pmin(max.adjusted.variance,df$qv))/exp(df$v));
-    df$gsf[!is.finite(df$gsf)] <- 0;
+  if(use.unadjusted.pvals) {
+    ods <- which(df$lp<log(alpha))
+  } else {
+    ods <- which(df$lpa<log(alpha))
+  }
+  if(verbose) {
+    print(paste0(length(ods), ' overdispersed genes ... ' ))
+  }
 
-    if(plot) {
-        if(do.par) {
-            par(mfrow=c(1,2), mar = c(3.5,3.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
-        }
-        smoothScatter(df$m,df$v,main='',xlab='log10[ magnitude ]',ylab='log10[ variance ]')
-        grid <- seq(min(df$m[vi]),max(df$m[vi]),length.out=1000)
-        lines(grid,predict(m,newdata=data.frame(m=grid)),col="blue")
-        if(length(ods)>0) {
-            points(df$m[ods],df$v[ods],pch='.',col=2,cex=1)
-        }
-        smoothScatter(df$m[vi],df$qv[vi],xlab='log10[ magnitude ]',ylab='',main='adjusted')
-        abline(h=1,lty=2,col=8)
-        if(is.finite(max.adjusted.variance)) { abline(h=max.adjusted.variance,lty=2,col=1) }
-        points(df$m[ods],df$qv[ods],col=2,pch='.')
-    }
+  df$gsf <- geneScaleFactors <- sqrt(pmax(min.adjusted.variance,pmin(max.adjusted.variance,df$qv))/exp(df$v));
+  df$gsf[!is.finite(df$gsf)] <- 0;
 
-    if(!details) {
-        ## variance normalize
-        norm.mat <- cd*df$gsf
-        return(norm.mat)
+  if(plot) {
+    if(do.par) {
+      par(mfrow=c(1,2), mar = c(3.5,3.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
     }
-    else {
-        ## return normalization factor
-        return(df)
+    smoothScatter(df$m,df$v,main='',xlab='log10[ magnitude ]',ylab='log10[ variance ]')
+    grid <- seq(min(df$m[vi]),max(df$m[vi]),length.out=1000)
+    lines(grid,predict(m,newdata=data.frame(m=grid)),col="blue")
+    if(length(ods)>0) {
+      points(df$m[ods],df$v[ods],pch='.',col=2,cex=1)
     }
+    smoothScatter(df$m[vi],df$qv[vi],xlab='log10[ magnitude ]',ylab='',main='adjusted')
+    abline(h=1,lty=2,col=8)
+    if(is.finite(max.adjusted.variance)) { abline(h=max.adjusted.variance,lty=2,col=1) }
+    points(df$m[ods],df$qv[ods],col=2,pch='.')
+  }
+
+  ## variance normalize
+  norm.mat <- cd*df$gsf
+  if(!details) {
+    return(norm.mat)
+  } else {
+    ## return normalization factor
+    return(list(mat=norm.mat, ods=ods, df=df))
+  }
 }
 ## BH P-value adjustment with a log option
 bh.adjust <- function(x, log = FALSE) {
-    nai <- which(!is.na(x))
-    ox <- x
-    x <- x[nai]
-    id <- order(x, decreasing = FALSE)
-    if(log) {
-        q <- x[id] + log(length(x)/seq_along(x))
-    } else {
-        q <- x[id]*length(x)/seq_along(x)
-    }
-    a <- rev(cummin(rev(q)))[order(id)]
-    ox[nai] <- a
-    ox
+  nai <- which(!is.na(x))
+  ox <- x
+  x <- x[nai]
+  id <- order(x, decreasing = FALSE)
+  if(log) {
+    q <- x[id] + log(length(x)/seq_along(x))
+  } else {
+    q <- x[id]*length(x)/seq_along(x)
+  }
+  a <- rev(cummin(rev(q)))[order(id)]
+  ox[nai] <- a
+  ox
 }
 
 
@@ -221,52 +220,53 @@ bh.adjust <- function(x, log = FALSE) {
 ##' @export
 ##'
 getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE, ...) {
-    if(class(mat)!='matrix') {
-        mat <- as.matrix(mat)
-    }
+  if(class(mat)!='matrix') {
+    mat <- as.matrix(mat)
+  }
 
-    if(verbose) {
-        print(paste0('Identifying top ', nPcs, ' PCs on ', nGenes, ' most variable genes ...'))
-    }
+  if(verbose) {
+    print(paste0('Identifying top ', nPcs, ' PCs on ', nGenes, ' most variable genes ...'))
+  }
 
-    ## get variable genes
-    vgenes <- getVariableGenes(mat, nGenes)
-    mat <- mat[vgenes,]
+  ## get variable genes
+  vgenes <- getVariableGenes(mat, nGenes)
+  mat <- mat[vgenes,]
 
-    ## get PCs
-    pcs <- fastPca(t(mat), nPcs, ...)
-    m <- t(pcs$l)
-    colnames(m) <- colnames(mat)
-    rownames(m) <- paste0('PC', seq_len(nPcs))
+  ## get PCs
+  pcs <- fastPca(t(mat), nPcs, ...)
+  m <- t(pcs$l)
+  colnames(m) <- colnames(mat)
+  rownames(m) <- paste0('PC', seq_len(nPcs))
 
-    return(m)
+  return(m)
 }
 fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=FALSE, transpose=FALSE, ...) {
-    ## note transpose is meant to speed up calculations when neither scaling nor centering is required
-    if(transpose) {
-        if(center) {
-            m <- m-Rfast::rowmeans(m)
-        }
-        if(scale) {
-            m <- m/sqrt(Rfast::rowsums(m*m))
-        }
-        a <- irlba::irlba(tcrossprod(m)/(ncol(m)-1), nu=0, nv=nPcs, tol=tol, ...)
-        a$l <- t(t(a$v) %*% m)
-    } else {
-        if(scale||center) {
-            m <- scale(m, scale=scale, center=center)
-        }
-        a <- irlba::irlba(crossprod(m)/(nrow(m)-1), nu=0, nv=nPcs, tol=tol, ...)
-        a$l <- m %*% a$v
+  ## note transpose is meant to speed up calculations when neither scaling nor centering is required
+  if(transpose) {
+    if(center) {
+      m <- m-Matrix::rowMeans(m)
     }
-    return(a)
+    if(scale) {
+      m <- m/sqrt(Matrix::rowSums(m*m))
+    }
+    a <- irlba::irlba(tcrossprod(m)/(ncol(m)-1), nu=0, nv=nPcs, tol=tol, ...)
+    a$l <- t(t(a$v) %*% m)
+  } else {
+    if(scale||center) {
+      m <- scale(m, scale=scale, center=center)
+    }
+    a <- irlba::irlba(crossprod(m)/(nrow(m)-1), nu=0, nv=nPcs, tol=tol, ...)
+    a$l <- m %*% a$v
+  }
+  return(a)
 }
 getVariableGenes <- function(mat, nGenes) {
-    vi <- Rfast::rowVars(mat)
-    names(vi) <- rownames(mat)
-    vgenes <- names(sort(vi, decreasing=TRUE)[seq_len(nGenes)])
-    return(vgenes)
+  vi <- apply(mat, 1, var)
+  names(vi) <- rownames(mat)
+  vgenes <- names(sort(vi, decreasing=TRUE)[seq_len(nGenes)])
+  return(vgenes)
 }
+
 
 ##' Get clusters by community detection on approximate nearest neighbors
 ##'
@@ -348,44 +348,69 @@ optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_w
     com.final <- results[[i]]$com
     return(com.final)
 }
-## When there are too many cells, getKNNMembership runs into memory issues
-## Also just takes too long
-## Need subsampling
-getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igraph::cluster_walktrap, seed=0, verbose=TRUE) {
 
-    if(verbose) {
-        print(paste0('Subsampling from ', ncol(mat), ' cells to ', nsubsample, ' ... '))
-    }
-    ## random subsampling
-    ## TODO: density based downsampling
-    set.seed(seed)
-    subsample <- sample(colnames(mat), nsubsample)
 
-    if(verbose) {
-        print('Identifying cluster membership for subsample ... ')
-    }
-    pcs.sub <- mat[, subsample]
-    com.sub <- getComMembership(pcs.sub, k=k, method=method)
+##' Get clusters by community detection on approximate nearest neighbors with subsampling
+##'
+##' Group cells into clusters based on graph-based community detection on approximate nearest neighbors for random subset of cells
+##' For when getComMembership takes too long due to there being too many cells
+##'
+##' @param mat Matrix of cells as columns. Features as rows (such as PCs).
+##' @param k K-nearest neighbor parameter.
+##' @param nsubsample Number of cells in subset (default: 50% ie. ncol(mat)*0.5)
+##' @param vote Use neighbor voting system to annotate rest of cells not in subset. If false, will use machine-learning model. (default: FALSE)
+##' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
+##' @param verbose Verbosity (default: TRUE)
+##'
+##' @return Vector of community annotations
+##'
+##' @examples {
+##' data(pbmcA)
+##' mat <- cleanCounts(pbmcA)
+##' mat <- normalizeVariance(mat)
+##' pcs <- getPcs(mat)
+##' com <- getApproxComMembership(pcs, k=30)
+##' }
+##'
+##' @export
+##'
+getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igraph::cluster_walktrap, seed=0, vote=FALSE, verbose=TRUE) {
 
-    if(verbose) {
-        print('Imputing cluster membership for rest of cells ... ')
-    }
+  if(verbose) {
+    print(paste0('Subsampling from ', ncol(mat), ' cells to ', nsubsample, ' ... '))
+  }
+  ## random subsampling
+  ## TODO: density based downsampling
+  set.seed(seed)
+  subsample <- sample(colnames(mat), nsubsample)
 
-    ## Use neighbor voting
-    ## data <- mat[, subsample]
-    ## query <- mat[, setdiff(colnames(mat), subsample)]
-    ## knn <- RANN::nn2(t(data), t(query), k=k2)[[1]]
-    ## rownames(knn) <- colnames(query)
-    ## com.nonsub <- unlist(apply(knn, 1, function(x) {
-    ##         ## nearest neighbors in data
-    ##         nn <- colnames(data)[x]
-    ##         ## look at their cell type annotations
-    ##         nn.com <- com.sub[nn]
-    ##         ## get most frequent annotation
-    ##         return(names(sort(table(nn.com), decreasing=TRUE)[1]))
-    ## }))
-    ## com.all <- factor(c(com.sub, com.nonsub)[colnames(mat)])
+  if(verbose) {
+    print('Identifying cluster membership for subsample ... ')
+  }
+  pcs.sub <- mat[, subsample]
+  com.sub <- getComMembership(pcs.sub, k=k, method=method)
 
+  if(verbose) {
+    print('Imputing cluster membership for rest of cells ... ')
+  }
+
+  ## Use neighbor voting
+  if(vote) {
+    data <- mat[, subsample]
+    query <- mat[, setdiff(colnames(mat), subsample)]
+    knn <- RANN::nn2(t(data), t(query), k=k)[[1]]
+    rownames(knn) <- colnames(query)
+    com.nonsub <- unlist(apply(knn, 1, function(x) {
+      ## nearest neighbors in data
+      nn <- colnames(data)[x]
+      ## look at their cell type annotations
+      nn.com <- com.sub[nn]
+      ## get most frequent annotation
+      return(names(sort(table(nn.com), decreasing=TRUE)[1]))
+    }))
+    com.all <- factor(c(com.sub, com.nonsub)[colnames(mat)])
+  }
+  else {
     ## Use model instead
     ## Inspired by DenSVM
     df.sub <- data.frame(celltype=com.sub, t(pcs.sub))
@@ -394,13 +419,13 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
     model.output <- predict(model, df.all)
     com.all <- model.output$class
     names(com.all) <- rownames(df.all)
-
     if(verbose) {
-        print("LDA prediction accuracy for subsample ...")
-        print(table(com.all[names(com.sub)]==com.sub))
+      print("Model accuracy for subsample ...")
+      print(table(com.all[names(com.sub)]==com.sub))
     }
+  }
 
-    return(com.all)
+  return(com.all)
 }
 
 
@@ -592,20 +617,16 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
     bar
   }); rownames(xr) <- rownames(cm)
   range(xr[,1])
-  xr[1:5,1:5]
-  cm[1:5,1:5]
   ##xr <- sparse_matrix_column_ranks(cm);
 
   # calculate rank sums per group
   grs <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(xr[cols==g,])))
   rownames(grs) <- levels(cols); colnames(grs) <- colnames(xr)
-  grs[1:5,1:5]
   ##grs <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
 
   # calculate number of non-zero entries per group
   gnzz <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(xr[cols==g,]>0)))
   rownames(gnzz) <- levels(cols); colnames(gnzz) <- colnames(xr)
-  gnzz[1:5,1:5]
   #xr@x <- numeric(length(xr@x))+1
   #gnzz <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
 
@@ -710,7 +731,7 @@ getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.6, verbose=TRUE
 
   ## feature selection
   ds <- getDifferentialGenes(cm, cols, verbose=verbose)
-  diff.genes <- lapply(ds, function(x) rownames(x)[abs(x$Z)>1.96 & x$highest])
+  diff.genes <- lapply(ds, function(x) rownames(x)[abs(x$Z)>z.threshold])
   #lapply(diff.genes, length)
   ## visualize
   #lapply(diff.genes, function(dg) {
@@ -813,13 +834,25 @@ tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=T
     }
 
     ## compute LDs
+    matm <- t(as.matrix(mat))
     if(class(model)=='lda') {
-        ##reduction <- t(mat[rownames(model$scaling),]) %*% model$scaling
-        reduction <- predict(model, data.frame(t(as.matrix(mat))))$x
+        genes.need <- rownames(model$scaling)
+        mat.temp <- matrix(0, nrow(matm), length(genes.need))
+        rownames(mat.temp) <- rownames(matm)
+        colnames(mat.temp) <- genes.need
+        genes.have <- intersect(genes.need, colnames(matm))
+        mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
+        predict(model, data.frame(mat.temp))$x
     }
     if(class(model)=='list') {
         reduction <- do.call(cbind, lapply(model, function(m) {
-                           reduction <- predict(m, data.frame(t(as.matrix(mat))))$x
+                            genes.need <- rownames(m$scaling)
+                            mat.temp <- matrix(0, nrow(matm), length(genes.need))
+                            rownames(mat.temp) <- rownames(matm)
+                            colnames(mat.temp) <- genes.need
+                            genes.have <- intersect(genes.need, colnames(matm))
+                            mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
+                            predict(m, data.frame(mat.temp))$x
                        }))
     }
 
