@@ -611,7 +611,7 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
   # calculate rank per column (per-gene) average rank matrix
   xr <- apply(cm, 2, function(foo) {
     #foo[foo==0] <- NA
-    bar <- Rfast::Rank(foo)
+    bar <- rank(foo)
     #bar[is.na(foo)] <- 0
     bar[foo==0] <- 0
     bar
@@ -620,12 +620,12 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
   ##xr <- sparse_matrix_column_ranks(cm);
 
   # calculate rank sums per group
-  grs <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(xr[cols==g,])))
+  grs <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(xr[cols==g,])))
   rownames(grs) <- levels(cols); colnames(grs) <- colnames(xr)
   ##grs <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
 
   # calculate number of non-zero entries per group
-  gnzz <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(xr[cols==g,]>0)))
+  gnzz <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(xr[cols==g,]>0)))
   rownames(gnzz) <- levels(cols); colnames(gnzz) <- colnames(xr)
   #xr@x <- numeric(length(xr@x))+1
   #gnzz <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
@@ -640,7 +640,7 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
   # rank of a 0 entry for each gene
   #zero.ranks <- (nrow(xr)-diff(xr@p)+1)/2 # number of total zero entries per gene
   zero.ranks <- apply(cm, 2, function(foo) {
-    bar <- Rfast::Rank(foo)
+    bar <- rank(foo)
     bar[foo==0][1]
   })
   ustat <- t((t(gnz)*zero.ranks)) + grs - group.size*(group.size+1)/2
@@ -662,8 +662,8 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
   colnames(x) <- levels(cols)[1:ncol(x)]
 
   # add fold change information
-  log.gene.av <- log2(Rfast::colmeans(cm));
-  group.gene.av <- do.call(rbind, lapply(levels(cols), function(g) Rfast::colsums(cm[cols==g,]>0))) / (group.size+1);
+  log.gene.av <- log2(Matrix::colMeans(cm));
+  group.gene.av <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(cm[cols==g,]>0))) / (group.size+1);
   log2.fold.change <- log2(t(group.gene.av)) - log.gene.av;
   # fraction of cells expressing
   f.expressing <- t(gnzz / group.size);
@@ -693,7 +693,7 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
         ds <- diffGenes
     }
 
-    if(upregulatedOnly) {
+    if(upregulated.only) {
         dg <- unique(unlist(lapply(ds, function(x) rownames(x)[x$Z>z.threshold])))
     } else {
         dg <- unique(unlist(lapply(ds, function(x) rownames(x)[abs(x$Z)>z.threshold])))
@@ -724,7 +724,7 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
     ))
 }
 
-getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.6, verbose=TRUE, plot=TRUE) {
+getStableClusters <- function(cm, cols, z.threshold=3, min.diff.genes=1, verbose=TRUE) {
   if(verbose) {
     print(paste0('Feature selection for ', length(levels(cols)), ' groups with Z threshold ', z.threshold))
   }
@@ -742,8 +742,18 @@ getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.6, verbose=TRUE
   #})
 
   diff.genes <- unique(unlist(diff.genes))
+  diff.genes <- na.omit(diff.genes)
   diff.genes <- intersect(diff.genes, colnames(cm))
-  length(diff.genes)
+
+  ## remove ribosomal and mitochondrial
+  diff.genes <- diff.genes[!grepl('^RPL|^MT-', diff.genes)]
+  print(length(diff.genes))
+  if(length(diff.genes)<min.diff.genes) {
+    print('no differential genes')
+    cols2 <- rep(1, length(cols))
+    names(cols2) <- names(cols)
+    return(cols2)
+  }
 
   ## assess accuracy
   set.seed(0)
@@ -754,7 +764,9 @@ getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.6, verbose=TRUE
   #set.seed(0)
   #train <- sample(rownames(cm), nrow(cm)*0.5)
   #test <- setdiff(rownames(cm), train)
-
+  if(verbose){
+    print('assessing stability...')
+  }
   preds <- lapply(folds, function(train) {
     test <- setdiff(rownames(cm), train)
     df <- data.frame(celltype=cols, as.matrix(cm[, diff.genes]))
@@ -814,12 +826,6 @@ getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.6, verbose=TRUE
 
   cols2 <- factor(cols, levels=names(newlevels), labels=newlevels)
   cols2 <- factor(cols2)
-
-  if(plot) {
-    par(mfrow=c(1,2))
-    plotEmbedding(myMudanObject1$emb[['PCA']], groups=cols, main='Original', show.legend=TRUE, mark.clusters=TRUE)
-    plotEmbedding(myMudanObject1$emb[['PCA']], groups=cols2, main='Merged', show.legend=TRUE, mark.clusters=TRUE)
-  }
 
   return(cols2)
 }
