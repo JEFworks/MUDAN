@@ -240,7 +240,7 @@ getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE,
 
   return(m)
 }
-fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=FALSE, transpose=FALSE, ...) {
+fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=TRUE, transpose=FALSE, ...) {
   ## note transpose is meant to speed up calculations when neither scaling nor centering is required
   if(transpose) {
     if(center) {
@@ -724,7 +724,7 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
     ))
 }
 
-getStableClusters <- function(cm, cols, z.threshold=3, min.diff.genes=1, verbose=TRUE) {
+getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.5, min.diff.genes=1, verbose=TRUE) {
   if(verbose) {
     print(paste0('Feature selection for ', length(levels(cols)), ' groups with Z threshold ', z.threshold))
   }
@@ -824,7 +824,8 @@ getStableClusters <- function(cm, cols, z.threshold=3, min.diff.genes=1, verbose
     }
   })
 
-  cols2 <- factor(cols, levels=names(newlevels), labels=newlevels)
+  cols2 <- factor(cols, levels=names(newlevels))
+  levels(cols2) <- newlevels
   cols2 <- factor(cols2)
 
   return(cols2)
