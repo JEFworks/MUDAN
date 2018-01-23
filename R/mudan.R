@@ -22,7 +22,7 @@
 ##'
 cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 1, min.detected = 1, verbose=TRUE) {
   if(class(counts)!="dgCMatrix") {
-    counts <- Matrix(counts, sparse=TRUE)
+    counts <- as.matrix(counts, sparse=TRUE)
   }
 
   if(verbose) {
@@ -65,7 +65,7 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 ##'
 normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
   if(class(counts)!="dgCMatrix") {
-    counts <- Matrix(counts, sparse=TRUE)
+    counts <- as.matrix(counts, sparse=TRUE)
   }
   if(verbose) {
     print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
@@ -109,7 +109,8 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 ##'
 normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
   if(class(cd)!="dgCMatrix") {
-    cd <- Matrix(cd, sparse=TRUE)
+    cd <- as.m
+    atrix(cd, sparse=TRUE)
   }
 
   mat <- t(cd) ## make rows as cells, cols as genes
