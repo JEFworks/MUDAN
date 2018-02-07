@@ -109,8 +109,7 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 ##'
 normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
   if(class(cd)!="dgCMatrix") {
-    cd <- as.m
-    atrix(cd, sparse=TRUE)
+    cd <- as.matrix(cd, sparse=TRUE)
   }
 
   mat <- t(cd) ## make rows as cells, cols as genes
