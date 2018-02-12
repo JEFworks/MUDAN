@@ -21,9 +21,6 @@
 ##' @export
 ##'
 cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 1, min.detected = 1, verbose=TRUE) {
-  if(class(counts)!="dgCMatrix") {
-    counts <- as.matrix(counts, sparse=TRUE)
-  }
 
   if(verbose) {
     print(paste0('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...'))
@@ -64,9 +61,6 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 ##' @export
 ##'
 normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
-  if(class(counts)!="dgCMatrix") {
-    counts <- as.matrix(counts, sparse=TRUE)
-  }
   if(verbose) {
     print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
   }
@@ -108,10 +102,6 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 ##' @export
 ##'
 normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
-  if(class(cd)!="dgCMatrix") {
-    cd <- as.matrix(cd, sparse=TRUE)
-  }
-
   mat <- t(cd) ## make rows as cells, cols as genes
 
   if(verbose) {
@@ -229,8 +219,10 @@ getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE,
   }
 
   ## get variable genes
-  vgenes <- getVariableGenes(mat, nGenes)
-  mat <- mat[vgenes,]
+  if(nGenes < nrow(mat)) {
+    vgenes <- getVariableGenes(mat, nGenes)
+    mat <- mat[vgenes,]
+  }
 
   ## get PCs
   pcs <- fastPca(t(mat), nPcs, ...)
@@ -452,36 +444,6 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 ##'
 ##' @export
 ##'
-modelLda.multicore <- function(mat, com, ncores=10, verbose=TRUE, retest=TRUE) {
-    ## split features randomly into ncores groups
-    ## ISSUE: each set of LDs only dependent on genes in group...not recommended
-    set.seed(0)
-    feature.set <- split(sample(rownames(mat)), seq_len(ncores), drop = FALSE)
-
-    ## train model for each feature set in parallele to speed things up
-    models <- parallel::mclapply(feature.set, function(vi) {
-        ## make data frame
-        df <- data.frame(celltype=com, as.matrix(t(mat[vi,])))
-
-        if(verbose) {
-            print("calculating LDA ...")
-        }
-        model <- MASS::lda(celltype ~ ., data=df)
-
-        if(retest) {
-            ## predict our data based on model
-            model.output <- predict(model, df)
-            if(verbose) {
-                print("LDA prediction accuracy ...")
-                print(table(model.output$class==com))
-            }
-        }
-
-        return(model)
-    }, mc.cores=ncores)
-
-    return(models)
-}
 modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, retest=TRUE) {
     ## filter to reduce feature modeling space
     if(nfeatures < nrow(mat)) {
@@ -616,7 +578,6 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
     bar[foo==0] <- 0
     bar
   }); rownames(xr) <- rownames(cm)
-  range(xr[,1])
   ##xr <- sparse_matrix_column_ranks(cm);
 
   # calculate rank sums per group
@@ -724,111 +685,121 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
     ))
 }
 
-getStableClusters <- function(cm, cols, z.threshold=3, fc=2, t=0.5, min.diff.genes=1, verbose=TRUE) {
-  if(verbose) {
-    print(paste0('Feature selection for ', length(levels(cols)), ' groups with Z threshold ', z.threshold))
+#' Iterative merging of clusters along tree until stable
+#'
+getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.diff.genes=nrow(cd)*0.01, max.iter=10, verbose=TRUE) {
+
+  ## bottom up approach
+  compare <- function(dend) {
+    g1 <- labels(dend[[1]])
+    g2 <- labels(dend[[2]])
+    incom <- names(com)[com %in% g1]
+    outcom <- names(com)[com %in% g2]
+    com.sub <- factor(c(
+      rep(paste0(g1, collapse="."), length(incom)),
+      rep(paste0(g2, collapse="."), length(outcom))))
+    names(com.sub) <- c(incom, outcom)
+    dg <- getDifferentialGenes(t(cd[, names(com.sub)]), com.sub, verbose=verbose)
+    dg.sig <- unlist(lapply(dg, function(x) {
+      ## get only significantly upregulated
+      x <- x[x$Z>z.threshold,]
+      x <- na.omit(x)
+      rownames(x)
+    }))
+    #dg.sig <- dg.sig[!grepl('RP|MT', dg.sig)] ## exclude ribosomal and mitochondrial?
+    return(dg.sig)
   }
-
-  ## feature selection
-  ds <- getDifferentialGenes(cm, cols, verbose=verbose)
-  diff.genes <- lapply(ds, function(x) rownames(x)[abs(x$Z)>z.threshold])
-  #lapply(diff.genes, length)
-  ## visualize
-  #lapply(diff.genes, function(dg) {
-  #  dg <- intersect(dg, colnames(cm))
-  #  m <- Rfast::rowsums(cm[,dg]>0)
-  #  names(m) <- rownames(cm)
-  #  plotEmbedding(myMudanObject1$emb[['PCA']], colors=m)
-  #})
-
-  diff.genes <- unique(unlist(diff.genes))
-  diff.genes <- na.omit(diff.genes)
-  diff.genes <- intersect(diff.genes, colnames(cm))
-
-  ## remove ribosomal and mitochondrial
-  diff.genes <- diff.genes[!grepl('^RPL|^MT-', diff.genes)]
-  print(length(diff.genes))
-  if(length(diff.genes)<min.diff.genes) {
-    print('no differential genes')
-    cols2 <- rep(1, length(cols))
-    names(cols2) <- names(cols)
-    return(cols2)
-  }
-
-  ## assess accuracy
-  set.seed(0)
-  cells <- rownames(cm); folds <- split(cells, ceiling(seq_along(cells)/(length(cells)/fc)))
-  #lapply(folds, length)
-
-  ## subsample
-  #set.seed(0)
-  #train <- sample(rownames(cm), nrow(cm)*0.5)
-  #test <- setdiff(rownames(cm), train)
-  if(verbose){
-    print('assessing stability...')
-  }
-  preds <- lapply(folds, function(train) {
-    test <- setdiff(rownames(cm), train)
-    df <- data.frame(celltype=cols, as.matrix(cm[, diff.genes]))
-    ## model
-    model <- MASS::lda(celltype ~ ., data=df[train,])
-    ## predict
-    model.output <- predict(model, df[test,])
-    pred <- model.output$class
-    names(pred) <- test
-    return(pred)
-  })
-  preds <- unlist(preds)
-  names(preds) <- sub('*.[.]','',names(preds))
-  #head(preds)
-
-  # ## assess accuracy
-  # acc <- sapply(levels(cols), function(g) {
-  #   #print(g)
-  #   vi <- names(preds)[cols[names(preds)]==g]
-  #   #print(table(preds[vi]))
-  #   acc <- table(preds[vi]==cols[vi])
-  #   acc <- acc[c('TRUE', 'FALSE')]
-  #   names(acc) <- c('TRUE', 'FALSE')
-  #   acc[is.na(acc)] <- 0
-  #
-  #   if(acc['TRUE']/sum(acc) < 0.5) {
-  #     foo = table(preds[vi])
-  #     foo = foo[-which(names(foo)==g)]
-  #     print(paste0('May want to merge ', g , ' with ', names(sort(foo, decreasing=TRUE)[1])))
-  #   }
-  #
-  #   return(acc['TRUE']/sum(acc))
-  # })
-  # names(acc) <- levels(cols)
-  # print(acc)
-
-  ## automerge
-  newlevels <- sapply(levels(cols), function(g) {
-    #print(g)
-    vi <- names(preds)[cols[names(preds)]==g]
-    #print(table(preds[vi]))
-    acc <- table(preds[vi]==cols[vi])
-    acc <- acc[c('TRUE', 'FALSE')]
-    names(acc) <- c('TRUE', 'FALSE')
-    acc[is.na(acc)] <- 0
-
-    if(acc['TRUE']/sum(acc) < t) {
-      foo = table(preds[vi])
-      foo = foo[-which(names(foo)==g)]
-      ng = names(sort(foo, decreasing=TRUE)[1])
-      print(paste0('Merging ', g , ' with ', ng))
-      return(ng)
+  pv.recur <- function(dend) {
+    if(is.leaf(dend[[1]]) & is.leaf(dend[[2]])) {
+      g1 <- paste0(labels(dend[[1]]), collapse=":")
+      g2 <- paste0(labels(dend[[2]]), collapse=":")
+      if(verbose) {
+        print(paste0('Comparing ', g1, ' and ', g2))
+      }
+      dg.sig <- compare(dend)
+      if(length(dg.sig)<min.diff.genes) {
+        if(verbose) {
+          print(paste0('Merging ', g1, ' and ', g2))
+        }
+        com.fin[com.fin==g1] <<- paste0(g1,'.', g2)
+        com.fin[com.fin==g2] <<- paste0(g1,'.', g2)
+      }
+      pv.sig.all[[g1]] <<- dg.sig
+      pv.sig.all[[g2]] <<- dg.sig
     } else {
-      return(g)
+      if(is.leaf(dend[[1]])) {
+        g1 <- paste0(labels(dend[[1]]), collapse=".")
+        g2 <- paste0(labels(dend[[2]]), collapse=".")
+        if(verbose) {
+          print(paste0('Comparing ', g1, ' and ', g2))
+        }
+        dg.sig <- compare(dend)
+
+        if(length(dg.sig)<min.diff.genes) {
+          if(verbose) {
+            print(paste0('Cannot distinguish ', g1, ' and ', g2))
+          }
+          com.fin[com.fin==g1] <<- NA
+        }
+        pv.sig.all[[g1]] <<- dg.sig
+      } else {
+        pv.recur(dend[[1]])
+      }
+      if(is.leaf(dend[[2]])) {
+        g1 <- paste0(labels(dend[[1]]), collapse=".")
+        g2 <- paste0(labels(dend[[2]]), collapse=".")
+        if(verbose) {
+          print(paste0('Comparing ', g1, ' and ', g2))
+        }
+        dg.sig <- compare(dend)
+
+        if(length(dg.sig)<min.diff.genes) {
+          if(verbose) {
+            print(paste0('Cannot distinguish ', g1, ' and ', g2))
+          }
+          com.fin[com.fin==g2] <<- NA
+        }
+        pv.sig.all[[g2]] <<- dg.sig
+      } else {
+        pv.recur(dend[[2]])
+      }
     }
-  })
+  }
 
-  cols2 <- factor(cols, levels=names(newlevels))
-  levels(cols2) <- newlevels
-  cols2 <- factor(cols2)
+  ## average within groups
+  i <- 1
+  repeat {
+    com <- factor(com)
+    mat.summary <- do.call(cbind, lapply(levels(com), function(ct) {
+      cells <- which(com==ct)
+      rowMeans(matnorm[, cells])
+    }))
+    colnames(mat.summary) <- levels(com)
+    dim(mat.summary)
+    ## cluster groups
+    hc <- hclust(dist(t(mat.summary)), method=hclust.method)
+    plot(hc)
+    dend <- as.dendrogram(hc)
+    com.fin <- as.character(com)
+    names(com.fin) <- names(com)
+    pv.sig.all <- list()
+    pv.recur(dend)
+    #plotEmbedding(emb, com.fin, mark.clusters=TRUE)
+    #print(table(com))
+    #print(table(com.fin))
+    ## converged
+    if(i>max.iter) {
+      break
+    }
+    if(sum(com==com.fin, na.rm=TRUE)>=min(sum(!is.na(com)), sum(!is.na(com.fin)))) {
+      break
+    }
+    com <- com.fin
+    i <- i+1
+  }
 
-  return(cols2)
+  return(list(com=com.fin, pv.sig=pv.sig.all))
+
 }
 
 ##' Run tSNE on LDs from model
