@@ -1,0 +1,263 @@
+---
+title: "Highlighting the features of MUDAN"
+author: "Jean Fan"
+date: '`r Sys.Date()`'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(
+    warning = FALSE,
+    message = FALSE,
+    fig.path = 'figure/',
+    cache.path = 'cache/',
+    cache = TRUE,
+    dev = 'png',
+    dpi=100, fig.width=6, fig.height=3
+)
+```
+
+```{r}
+library(MUDAN)
+```
+
+# MUDAN features
+
+## (1) Fast, flexible analysis
+
+```{r}
+data(pbmcA) ## load built in 10X pbmcA dataset
+## downsample for testing purposes only
+#pbmcA <- as.matrix(pbmcA[, 1:1000]) 
+pbmcA <- as.matrix(pbmcA)
+
+start_time <- Sys.time()
+
+## filter out poor genes and cells
+cd <- cleanCounts(pbmcA, 
+                  min.reads = 10, 
+                  min.detected = 10, 
+                  verbose=FALSE)
+## CPM normalization
+mat <- normalizeCounts(cd, 
+                       verbose=FALSE) 
+## variance normalize, identify overdispersed genes
+matnorm.info <- normalizeVariance(mat, 
+                                  details=TRUE, 
+                                  verbose=FALSE) 
+## log transform
+matnorm <- log10(matnorm.info$mat+1) 
+## 30 PCs on overdispersed genes
+pcs <- getPcs(matnorm[matnorm.info$ods,], 
+              nGenes=length(matnorm.info$ods), 
+              nPcs=30, 
+              verbose=FALSE) 
+## get tSNE embedding on PCs
+emb <- Rtsne::Rtsne(pcs, 
+                    is_distance=FALSE, 
+                    perplexity=30, 
+                    num_threads=parallel::detectCores(), 
+                    verbose=FALSE)$Y 
+rownames(emb) <- rownames(pcs)
+
+end_time <- Sys.time()
+print(paste0("Analysis of ", 
+             ncol(cd), " cells and ", 
+             nrow(cd), " genes took ", 
+             end_time - start_time, " seconds"))
+
+## plot expression of marker genes
+marker.genes <- c('MS4A1', 'CD14', 'FCGR3A', 'GZMB', 'CD8A', 'CD4')
+par(mfrow=c(2,3), mar=c(0.5,0.5,2,0.5))
+invisible(lapply(marker.genes, function(g) {
+  gcol <- cd[g,] ## plot a gene
+  plotEmbedding(emb, 
+                color=gcol, 
+                mark.clusters=TRUE, 
+                main=g, xlab=NA, ylab=NA, 
+                verbose=FALSE, alpha=0.1) 
+}))
+```
+
+## (2) Graph-based subpopulation detection and subpopulation stability analysis
+
+```{r}
+## graph-based community detection; over cluster with small k
+com <- getComMembership(pcs, 
+                        k=15, method=igraph::cluster_infomap, 
+                        verbose=FALSE) 
+
+## get stable clusters
+stable <- getStableClusters(cd, com, matnorm, 
+                            min.group.size=10, min.diff.genes=10, 
+                            z.threshold=1.96, 
+                            verbose=FALSE, plot=FALSE)
+
+## plot
+par(mfrow=c(1,2), mar=c(0.5,0.5,2,0.5))
+plotEmbedding(emb, com, 
+              main='Overclustered', xlab=NA, ylab=NA, 
+              mark.clusters=TRUE, alpha=0.1, mark.cluster.cex=0.5,
+              verbose=FALSE) ## plot
+plotEmbedding(emb, groups=stable$com, 
+              main='Stable clusters', xlab=NA, ylab=NA, 
+              mark.clusters=TRUE, alpha=0.1, mark.cluster.cex=0.5,
+              verbose=FALSE) 
+```
+
+```{r}
+## plot significant differential genes as heatmap
+dg <- getDifferentialGenes(cd, stable$com)
+dg <- dg[stable$hc$labels[stable$hc$order]]
+dg.sig <- unlist(lapply(dg, function(x) {
+  x <- x[x$Z>1.96,] ## significant z-score
+  x <- x[x$highest,] ## must be highest in this group (optimal markers)
+  rownames(x)
+}))
+dg.sig <- intersect(dg.sig, rownames(stable$mat.summary))
+m <- stable$mat.summary[dg.sig,]
+heatmap(m, 
+        Rowv=NA, Colv=as.dendrogram(stable$hc),
+        col=colorRampPalette(c("blue", "white", "red"))(100),
+        scale="row", trace="none", labRow=NA)
+```
+
+## (3) LDA-based embedding to optimally separate clusters for visualization
+
+```{r}
+## train LDA model
+## train on detected significantly differentially expressed genes among stable clusters
+genes <- intersect(unique(unlist(stable$pv.sig)), rownames(matnorm)) 
+mn <- matnorm[genes,]
+model <- modelLda(mat=mn, com=stable$com, 
+                  retest=FALSE, verbose=FALSE)
+## remember normalization parameters
+gsf <- matnorm.info$df$gsf
+names(gsf) <- rownames(matnorm.info$df)
+ods <- rownames(matnorm.info$mat)[matnorm.info$ods]
+## project to LD space
+preds <- predict(model, data.frame(t(log10(as.matrix(mat[names(gsf),]*gsf+1)))))
+lds <- preds$x
+class <- getConfidentPreds(preds$posterior)
+emb.lds <- Rtsne::Rtsne(lds, 
+                        is_distance=FALSE, 
+                        perplexity=30, 
+                        num_threads=parallel::detectCores(), 
+                        verbose=FALSE)$Y 
+rownames(emb.lds) <- rownames(lds)
+
+## compare
+par(mfrow=c(1,2), mar=c(0.5,0.5,2,0.5))
+plotEmbedding(emb, groups=class, 
+              main='PCA-based tSNE embedding', xlab=NA, ylab=NA, 
+              mark.clusters=TRUE, alpha=0.1, mark.cluster.cex=0.5,
+              verbose=FALSE)
+plotEmbedding(emb.lds, groups=class, 
+              main='LDA-based tSNE embedding', xlab=NA, ylab=NA, 
+              mark.clusters=TRUE, alpha=0.1, mark.cluster.cex=0.5,
+              verbose=FALSE)
+```
+
+## (4) Projecting new samples into same LD-space to derive common embedding
+
+```{r}
+## load new dataset
+data(pbmcC)
+## downsample for testing purposes only
+#pbmcC <- as.matrix(pbmcC[, 1:1000]) 
+pbmcC <- as.matrix(pbmcC)
+
+## combine with old dataset
+cds <- list(pbmcA, pbmcC)
+genes.int <- Reduce(intersect, lapply(cds, rownames))
+cds.filtered <- lapply(cds, function(x) as.matrix(x[genes.int,]))
+cds.all <- cleanCounts(do.call(cbind, cds.filtered), 
+                       min.detected=10, verbose=FALSE)
+batch <- factor(unlist(lapply(colnames(cds.all), function(x) {
+  strsplit(x, '_')[[1]][4] })))
+names(batch) <- colnames(cds.all) ## get sample annotations
+mat.all <- normalizeCounts(cds.all, verbose=FALSE)
+```
+
+```{r}
+## Standard analysis with combined data shows batch effects
+matnorm.all.info <- normalizeVariance(mat.all, details=TRUE) 
+matnorm.all <- log10(matnorm.all.info$mat+1) 
+pcs.all <- getPcs(matnorm.all[matnorm.all.info$ods,], 
+                  nGenes=length(matnorm.all.info$ods), 
+                  nPcs=30) 
+emb.all <- Rtsne::Rtsne(pcs.all, 
+                        is_distance=FALSE, 
+                        perplexity=30, 
+                        num_threads=parallel::detectCores(), 
+                        verbose=TRUE)$Y 
+rownames(emb.all) <- rownames(pcs.all)
+```
+
+```{r}
+## Regular batch correction
+pcs.all.bc <- t(sva::ComBat(t(pcs.all), batch))
+emb.all.bc <- Rtsne::Rtsne(pcs.all.bc, 
+                           is_distance=FALSE, 
+                           perplexity=30, 
+                           num_threads=parallel::detectCores(), 
+                           verbose=TRUE)$Y
+rownames(emb.all.bc) <- rownames(pcs.all.bc)
+```
+
+```{r}
+## MUDAN-based approach
+## apply pbmcA's model and gene scaling factors
+preds.all <- predictLds(mat.all, model, gsf, verbose=FALSE)
+lds.all <- preds.all$x
+com.final <- factor(preds.all$class); names(com.final) <- rownames(preds.all$x)
+## batch correct within clusters
+lds.bc <- clusterBasedBatchCorrect(lds.all, batch, com.final)
+## get common embedding
+emb.lds.bc <- Rtsne::Rtsne(lds.bc, 
+                           is_distance=FALSE, 
+                           perplexity=30, 
+                           num_threads=parallel::detectCores(), 
+                           verbose=FALSE)$Y
+rownames(emb.lds.bc) <- rownames(lds.bc)
+
+## plot
+par(mfrow=c(1,2), mar=c(0.5,0.5,2,0.5))
+plotEmbedding(emb.lds.bc, com.final, 
+              main="MUDAN with combined annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+plotEmbedding(emb.lds.bc, batch,
+              main="MUDAN with batch annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+
+## regular batch corrected
+plotEmbedding(emb.all.bc, com.final,
+              main="Batch-corrected PCA with combined annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+plotEmbedding(emb.all.bc, batch, 
+              main="Batch-corrected PCA with batch annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+
+## no batch correction
+plotEmbedding(emb.all, com.final,
+              main="PCA with combined annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+plotEmbedding(emb.all, batch, 
+              main="PCA with batch annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+```
+
+```{r}
+## plot expression of marker genes
+par(mfrow=c(2,3), mar=c(0.5,0.5,2,0.5))
+invisible(lapply(marker.genes, function(g) {
+  gcol <- cds.all[g,] ## plot a gene
+  plotEmbedding(emb.lds.bc, color=gcol, 
+                main=g, xlab=NA, ylab=NA, 
+                alpha=0.1, 
+                verbose=FALSE) 
+}))
+```
