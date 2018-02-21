@@ -2,7 +2,7 @@
 ##'
 ##' Filter counts matrix based on gene and cell requirements
 ##'
-##' @param counts A sparse read count matrix. The rows correspond to genes, columns correspond to individual cells
+##' @param counts A read count matrix. The rows correspond to genes, columns correspond to individual cells
 ##' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)
 ##' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
 ##' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
@@ -20,20 +20,20 @@
 ##'
 ##' @export
 ##'
-cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 1, min.detected = 1, verbose=TRUE) {
+cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 10, min.detected = 5, verbose=TRUE) {
 
   if(verbose) {
     print(paste0('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...'))
   }
 
   ## filter out low-gene cells
-  counts <- counts[, Matrix::colSums(counts)>min.lib.size]
+  counts <- counts[, colSums(counts)>min.lib.size]
   ## filter out potential doublets
-  counts <- counts[, Matrix::colSums(counts)<max.lib.size]
+  counts <- counts[, colSums(counts)<max.lib.size]
   ## remove genes that don't have many reads
-  counts <- counts[Matrix::rowSums(counts)>min.reads, ]
+  counts <- counts[rowSums(counts)>min.reads, ]
   ## remove genes that are not seen in a sufficient number of cells
-  counts <- counts[Matrix::rowSums(counts>0)>min.detected, ]
+  counts <- counts[rowSums(counts>0)>min.detected, ]
 
   if(verbose) {
     print(paste0('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
@@ -65,7 +65,7 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
     print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
   }
 
-  counts <- t(t(counts)/Matrix::colSums(counts))
+  counts <- t(t(counts)/colSums(counts))
   counts <- counts*depthScale
 
   return(counts)
@@ -101,13 +101,13 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 ##'
 ##' @export
 ##'
-normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
-  mat <- t(cd) ## make rows as cells, cols as genes
+normalizeVariance <- function(counts, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
+  mat <- t(counts) ## make rows as cells, cols as genes
 
   if(verbose) {
     print("Calculating variance fit ...")
   }
-  dfm <- log(Matrix::colMeans(mat))
+  dfm <- log(colMeans(mat))
   dfv <- log(apply(mat, 2, var))
   names(dfm) <- names(dfv) <- colnames(mat)
   df <- data.frame(m=dfm, v=dfv)
@@ -164,7 +164,7 @@ normalizeVariance <- function(cd, gam.k=5, alpha=0.05, plot=FALSE, use.unadjuste
   }
 
   ## variance normalize
-  norm.mat <- cd*df$gsf
+  norm.mat <- counts*df$gsf
   if(!details) {
     return(norm.mat)
   } else {
@@ -225,31 +225,20 @@ getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE,
   }
 
   ## get PCs
-  pcs <- fastPca(t(mat), nPcs, ...)
+  pcs <- fastPca(t(mat), nPcs, center=TRUE, ...)
   m <- t(pcs$l)
   colnames(m) <- colnames(mat)
   rownames(m) <- paste0('PC', seq_len(nPcs))
 
-  return(m)
+  return(t(m))
 }
-fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=TRUE, transpose=FALSE, ...) {
-  ## note transpose is meant to speed up calculations when neither scaling nor centering is required
-  if(transpose) {
-    if(center) {
-      m <- m-Matrix::rowMeans(m)
-    }
-    if(scale) {
-      m <- m/sqrt(Matrix::rowSums(m*m))
-    }
-    a <- irlba::irlba(tcrossprod(m)/(ncol(m)-1), nu=0, nv=nPcs, tol=tol, ...)
-    a$l <- t(t(a$v) %*% m)
-  } else {
-    if(scale||center) {
-      m <- scale(m, scale=scale, center=center)
-    }
-    a <- irlba::irlba(crossprod(m)/(nrow(m)-1), nu=0, nv=nPcs, tol=tol, ...)
-    a$l <- m %*% a$v
+fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=TRUE, ...) {
+  if(scale||center) {
+    m <- scale(m, scale=scale, center=center)
   }
+  a <- irlba::irlba(crossprod(m)/(nrow(m)-1), nu=0, nv=nPcs, tol=tol, ...)
+  a$l <- m %*% a$v
+
   return(a)
 }
 getVariableGenes <- function(mat, nGenes) {
@@ -282,63 +271,46 @@ getVariableGenes <- function(mat, nGenes) {
 ##' @export
 ##'
 getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TRUE, details=FALSE) {
-    if(verbose) {
-        print("finding approximate nearest neighbors ...")
-    }
-    knn <- RANN::nn2(t(mat), k=k)[[1]]
+  if(verbose) {
+    print("finding approximate nearest neighbors ...")
+  }
+  knn <- RANN::nn2(mat, k=k)[[1]]
 
-    ## convert to adjacency matrix
-    adj <- matrix(0, ncol(mat), ncol(mat))
-    rownames(adj) <- colnames(adj) <- colnames(mat)
-    invisible(lapply(seq_len(ncol(mat)), function(i) {
-        adj[i,colnames(mat)[knn[i,]]] <<- 1
-    }))
+  ## convert to adjacency matrix
+  adj <- matrix(0, nrow(mat), nrow(mat))
+  rownames(adj) <- colnames(adj) <- rownames(mat)
+  invisible(lapply(seq_len(nrow(mat)), function(i) {
+    adj[i,rownames(mat)[knn[i,]]] <<- 1
+  }))
 
-    ## convert to graph for clustering
-    if(verbose) {
-        print("calculating clustering ...")
-    }
-    g <- igraph::graph.adjacency(adj, mode="undirected")
-    g <- igraph::simplify(g)
-    km <- method(g)
-    if(verbose) {
-        mod <- igraph::modularity(km)
-        if(mod < 0.3) { print('WARNING') }
-        print(paste0('graph modularity: ', mod))
-    }
+  ## convert to graph for clustering
+  if(verbose) {
+    print("calculating clustering ...")
+  }
+  g <- igraph::graph.adjacency(adj, mode="undirected")
+  g <- igraph::simplify(g)
+  km <- method(g)
+  if(verbose) {
+    mod <- igraph::modularity(km)
+    if(mod < 0.3) { print('WARNING') }
+    print(paste0('graph modularity: ', mod))
+  }
 
-    ## community membership
-    com <- km$membership
-    names(com) <- km$names
-    com <- factor(com)
+  ## community membership
+  com <- km$membership
+  names(com) <- km$names
+  com <- factor(com)
 
-    if(verbose) {
-        print("identifying cluster membership ...")
-        print(table(com))
-    }
-    if(details) {
-        return(list(com=com, mod=mod, g=g))
-    }
-    else {
-        return(com)
-    }
-}
-## Test a set of ks for modularity
-## TODO: Modularity is a function of k; need permutation to establish baseline and see if observed modularity for a particular k is significantly better than random
-optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_walktrap, verbose=TRUE) {
-    results <- lapply(ks, function(k) {
-        if(verbose) {
-            print(paste0('testing k:', k, ' ...'))
-        }
-        getComMembership(mat, k, details=TRUE)
-    })
-    mods <- sapply(results, function(x) x$mod)
-    i <- which(mods==max(mods))
-    if(verbose) {
-        print(paste0('optimal k:', ks[i], ' ...'))
-    }
-    com.final <- results[[i]]$com
-    return(com.final)
+  if(verbose) {
+    print("identifying cluster membership ...")
+    print(table(com))
+  }
+  if(details) {
+    return(list(com=com, mod=mod, g=g))
+  }
+  else {
+    return(com)
+  }
 }
 
 
@@ -349,7 +321,7 @@ optimizeModularity <- function(mat, ks=c(15,30,50,100), method=igraph::cluster_w
 ##'
 ##' @param mat Matrix of cells as columns. Features as rows (such as PCs).
 ##' @param k K-nearest neighbor parameter.
-##' @param nsubsample Number of cells in subset (default: 50% ie. ncol(mat)*0.5)
+##' @param nsubsample Number of cells in subset (default: ncol(mat)*0.5)
 ##' @param vote Use neighbor voting system to annotate rest of cells not in subset. If false, will use machine-learning model. (default: FALSE)
 ##' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
 ##' @param verbose Verbosity (default: TRUE)
@@ -427,7 +399,6 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 ##'
 ##' @param mat Expression matrix with cells as columns, transferable features such as genes as rows.
 ##' @param com Community annotations
-##' @param ncores Number of cores for parallelization.
 ##' @param verbose Verbosity (default: TRUE)
 ##' @param retest Whether to retest model for accuracy
 ##'
@@ -445,112 +416,50 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 ##' @export
 ##'
 modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, retest=TRUE) {
-    ## filter to reduce feature modeling space
-    if(nfeatures < nrow(mat)) {
-        if(random) {
-            ## random
-            set.seed(0)
-            vi <- sample(rownames(mat), nfeatures)
-            mat <- mat[vi,]
-        } else {
-            ## most variable (assumes properly variance normalized matrix...fix)
-            vi <- getVariableGenes(mat, nfeatures)
-            mat <- mat[vi,]
-        }
+  ## filter to reduce feature modeling space
+  if(nfeatures < nrow(mat)) {
+    if(random) {
+      ## random
+      set.seed(0)
+      vi <- sample(rownames(mat), nfeatures)
+      mat <- mat[vi,]
+    } else {
+      ## most variable (assumes properly variance normalized matrix...fix)
+      vi <- getVariableGenes(mat, nfeatures)
+      mat <- mat[vi,]
     }
+  }
 
-    df <- data.frame(celltype=com, as.matrix(t(mat)))
+  df <- data.frame(celltype=com, as.matrix(t(mat)))
 
+  if(verbose) {
+    print("calculating LDA ...")
+  }
+  model <- MASS::lda(celltype ~ ., data=df)
+
+  if(retest) {
+    ## predict our data based on model
+    model.output <- predict(model, df)
     if(verbose) {
-        print("calculating LDA ...")
+      print("LDA prediction accuracy ...")
+      print(table(model.output$class==com))
     }
-    model <- MASS::lda(celltype ~ ., data=df)
+  }
 
-    if(retest) {
-        ## predict our data based on model
-        model.output <- predict(model, df)
-        if(verbose) {
-            print("LDA prediction accuracy ...")
-            print(table(model.output$class==com))
-        }
-    }
-
-    return(model)
+  return(model)
 }
 
 
-
-getClusterGeneInfo <- function(mat, com, verbose=FALSE, ncores=10) {
-
-    if(class(mat)!='matrix') {
-        mat <- as.matrix(mat)
-    }
-    if(class(com)!='factor') {
-        com <- factor(com)
-    }
-    if(!all(colnames(mat) %in% names(com))) { warning("cluster vector doesn't specify groups for all of the cells, dropping missing cells from comparison")}
-    ## determine a subset of cells that's in the cols and cols[cell]!=NA
-    valid.cells <- colnames(mat) %in% names(com)[!is.na(com)]
-    if(!all(valid.cells)) {
-        ## take a subset of the count matrix
-        mat <- mat[, valid.cells]
-    }
-    ## reorder cols
-    cols <- com
-    cols <- as.factor(cols[match(colnames(mat),names(cols))])
-    cols <- as.factor(cols)
-
-    ## run simple wilcoxon test comparing each group with the rest
-    diffgenes <- lapply(levels(cols), function(g) {
-        if(verbose) {
-            print(paste0("Testing group ", g, " ... "))
-        }
-
-        x <- mat[,cols==g]
-        y <- mat[,cols!=g]
-
-        ## aucs and pvalues
-        aucs.pvs <- parallel::mclapply(seq_len(nrow(x)), function(i) {
-            auc <- markerAuc(x[i,], y[i,])
-            pv <- wilcox.test(x[i,], y[i,], alternative="greater")$p.value
-            return(list(auc, pv))
-        }, mc.cores=ncores)
-        aucs <- sapply(aucs.pvs, function(x) x[[1]])
-        pvs <- sapply(aucs.pvs, function(x) x[[2]])
-
-        ## assess average fold change
-        xm <- Rfast::rowmeans(x)
-        ym <- Rfast::rowmeans(y)
-        fc <- log2(xm/ym)
-        ## percent expressing
-        pe <- Rfast::rowsums(x>0)/ncol(x)
-        ## z-score
-        zs <- abs(qnorm(1 - (pvs/2), lower.tail=FALSE))*sign(fc)
-
-        ## store p value
-        df <- data.frame(p.value=pvs, marker.auc=aucs, log2.fold.change=fc, percent.expressing=pe, z.score=zs)
-        rownames(df) <- rownames(mat)
-
-        return(df)
-    })
-    names(diffgenes) <- levels(cols)
-
-    return(diffgenes)
-}
-## Test how well does a gene discriminates a population
-## adapted from seurat package
-markerAuc <- function(x, y) {
-    pred <- ROCR::prediction(
-        predictions = c(x, y),
-        labels = c(rep(x = 1, length(x)), rep(x = 0, length(y))),
-        label.ordering = 0:1
-    )
-    perf <- ROCR::performance(pred, measure = "auc")
-    auc <- perf@y.values[[1]]
-    return(auc)
-}
-
-getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
+##' Differential expression analysis (adapted from PAGODA2)
+##'
+##' @param counts A read count matrix. The rows correspond to genes, columns correspond to individual cells
+##' @param cols Column/cell group annotations. Will perform one vs. all differential expression analysis.
+##' @param verbose Verbosity
+##'
+##' @export
+##'
+getDifferentialGenes <- function(cd, cols, verbose=TRUE) {
+  cm <- t(cd)
 
   ## match matrix rownames (cells) and group annotations
   if(!all(rownames(cm) %in% names(cols))) { warning("Cluster vector doesn't specify groups for all of the cells, dropping missing cells from comparison")}
@@ -634,7 +543,7 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
     print("Summarizing results ... ")
   }
 
-  ## sumarize
+  ## summarize
   ds <- lapply(1:ncol(x),function(i) {
     r <- data.frame(Z=x[,i],M=log2.fold.change[,i],highest=max.group==i,fe=f.expressing[,i])
     rownames(r) <- rownames(x)
@@ -644,52 +553,137 @@ getDifferentialGenes <- function(cm, cols, verbose=TRUE) {
 
   return(ds)
 }
+## annotate clusters; old; needs major speed improvement
+getClusterGeneInfo <- function(mat, com, verbose=FALSE, ncores=10) {
 
+  if(class(mat)!='matrix') {
+    mat <- as.matrix(mat)
+  }
+  if(class(com)!='factor') {
+    com <- factor(com)
+  }
+  if(!all(colnames(mat) %in% names(com))) { warning("cluster vector doesn't specify groups for all of the cells, dropping missing cells from comparison")}
+  ## determine a subset of cells that's in the cols and cols[cell]!=NA
+  valid.cells <- colnames(mat) %in% names(com)[!is.na(com)]
+  if(!all(valid.cells)) {
+    ## take a subset of the count matrix
+    mat <- mat[, valid.cells]
+  }
+  ## reorder cols
+  cols <- com
+  cols <- as.factor(cols[match(colnames(mat),names(cols))])
+  cols <- as.factor(cols)
+
+  ## run simple wilcoxon test comparing each group with the rest
+  diffgenes <- lapply(levels(cols), function(g) {
+    if(verbose) {
+      print(paste0("Testing group ", g, " ... "))
+    }
+
+    x <- mat[,cols==g]
+    y <- mat[,cols!=g]
+
+    ## aucs and pvalues
+    aucs.pvs <- parallel::mclapply(seq_len(nrow(x)), function(i) {
+      auc <- markerAuc(x[i,], y[i,])
+      pv <- wilcox.test(x[i,], y[i,], alternative="greater")$p.value
+      return(list(auc, pv))
+    }, mc.cores=ncores)
+    aucs <- sapply(aucs.pvs, function(x) x[[1]])
+    pvs <- sapply(aucs.pvs, function(x) x[[2]])
+
+    ## assess average fold change
+    xm <- Rfast::rowmeans(x)
+    ym <- Rfast::rowmeans(y)
+    fc <- log2(xm/ym)
+    ## percent expressing
+    pe <- Rfast::rowsums(x>0)/ncol(x)
+    ## z-score
+    zs <- abs(qnorm(1 - (pvs/2), lower.tail=FALSE))*sign(fc)
+
+    ## store p value
+    df <- data.frame(p.value=pvs, marker.auc=aucs, log2.fold.change=fc, percent.expressing=pe, z.score=zs)
+    rownames(df) <- rownames(mat)
+
+    return(df)
+  })
+  names(diffgenes) <- levels(cols)
+
+  return(diffgenes)
+}
+## Test how well does a gene discriminates a population
+## adapted from seurat package
+## too slow; to do
+markerAuc <- function(x, y) {
+  pred <- ROCR::prediction(
+    predictions = c(x, y),
+    labels = c(rep(x = 1, length(x)), rep(x = 0, length(y))),
+    label.ordering = 0:1
+  )
+  perf <- ROCR::performance(pred, measure = "auc")
+  auc <- perf@y.values[[1]]
+  return(auc)
+}
 ## diffGenes is output of getDifferentialGenes
 getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.threshold=3, auc.threshold=0.5, fe.threshold=0.5, M.threshold=0.1, verbose=TRUE, ncores=1) {
 
-    if(is.null(diffGenes)) {
-        ds <- getDifferentialGenes(mat, com)
-    } else {
-        ds <- diffGenes
-    }
+  if(is.null(diffGenes)) {
+    ds <- getDifferentialGenes(mat, com)
+  } else {
+    ds <- diffGenes
+  }
 
+  if(upregulated.only) {
+    dg <- unique(unlist(lapply(ds, function(x) rownames(x)[x$Z>z.threshold])))
+  } else {
+    dg <- unique(unlist(lapply(ds, function(x) rownames(x)[abs(x$Z)>z.threshold])))
+  }
+  dg <- intersect(dg, rownames(mat))
+  mat <- mat[dg,]
+
+  ## get info
+  df.info <- df.list <- getClusterGeneInfo(mat, com, verbose, ncores)
+
+  ## filter
+  genes <- lapply(df.list, function(df) {
     if(upregulated.only) {
-        dg <- unique(unlist(lapply(ds, function(x) rownames(x)[x$Z>z.threshold])))
+      df <- df[df$z.score > z.threshold,]
     } else {
-        dg <- unique(unlist(lapply(ds, function(x) rownames(x)[abs(x$Z)>z.threshold])))
+      df <- df[abs(df$z.score) > z.threshold,]
     }
-    dg <- intersect(dg, rownames(mat))
-    mat <- mat[dg,]
+    df <- df[df$marker.auc > auc.threshold,]
+    df <- df[df$fe > fe.threshold,]
+    df <- df[df$M > M.threshold,]
+    return(rownames(df))
+  })
+  names(genes) <- names(df.list)
 
-    ## get info
-    df.info <- df.list <- getClusterGeneInfo(mat, com, verbose, ncores)
-
-    ## filter
-    genes <- lapply(df.list, function(df) {
-        if(upregulated.only) {
-            df <- df[df$z.score > z.threshold,]
-        } else {
-            df <- df[abs(df$z.score) > z.threshold,]
-        }
-        df <- df[df$marker.auc > auc.threshold,]
-        df <- df[df$fe > fe.threshold,]
-        df <- df[df$M > M.threshold,]
-        return(rownames(df))
-    })
-    names(genes) <- names(df.list)
-
-    return(list(
-        genes=genes,
-        info=df.info
-    ))
+  return(list(
+    genes=genes,
+    info=df.info
+  ))
 }
 
-#' Iterative merging of clusters along tree until stable
-#'
-getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.diff.genes=nrow(cd)*0.01, max.iter=10, verbose=TRUE) {
 
-  ## bottom up approach
+##' Iterative merging of clusters along tree until stable
+##'
+##' @param cd Counts matrix for differential expression analysis. Rows are genes. Columns are cells.
+##' @param com Community/group annotations for cells
+##' @param matnorm Normalized gene expression matrix for building group relationship tree. Rows are genes. Columns are cells.
+##' @param z.threshold Z-score threshold for identifying significantly differentially expressed genes
+##' @param hcluster.method Hierarchical clustering method used to construct relationship tree
+##' @param min.diff.genes Minimum number of significantly differentially expressed genes that must be identified or else groups will be merged
+##' @param max.iter Maximum number of iterations. Will end earlier if convergence reached.
+##' @param verbose Verbosity
+##'
+##' @export
+##'
+getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.group.size=10, min.diff.genes=nrow(cd)*0.005, max.iter=10, verbose=TRUE) {
+
+  if(min.group.size>1) { com[com %in% levels(com)[unlist(tapply(com,com,length))<min.group.size]] <- NA; com <- droplevels(com); }
+  com <- as.factor(com)[colnames(cd)]
+
+  ## compute differentially expressed genes between two branches of dendrogram
   compare <- function(dend) {
     g1 <- labels(dend[[1]])
     g2 <- labels(dend[[2]])
@@ -699,25 +693,32 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
       rep(paste0(g1, collapse="."), length(incom)),
       rep(paste0(g2, collapse="."), length(outcom))))
     names(com.sub) <- c(incom, outcom)
-    dg <- getDifferentialGenes(t(cd[, names(com.sub)]), com.sub, verbose=verbose)
-    dg.sig <- unlist(lapply(dg, function(x) {
+    dg <- getDifferentialGenes(cd[, names(com.sub)], com.sub, verbose=verbose)
+    dg.sig <- lapply(dg, function(x) {
       ## get only significantly upregulated
       x <- x[x$Z>z.threshold,]
       x <- na.omit(x)
       rownames(x)
-    }))
+    })
     #dg.sig <- dg.sig[!grepl('RP|MT', dg.sig)] ## exclude ribosomal and mitochondrial?
     return(dg.sig)
   }
+  ## recursively trace dendrogram
   pv.recur <- function(dend) {
+    ## compares leaves of tree (groups)
     if(is.leaf(dend[[1]]) & is.leaf(dend[[2]])) {
       g1 <- paste0(labels(dend[[1]]), collapse=":")
       g2 <- paste0(labels(dend[[2]]), collapse=":")
       if(verbose) {
         print(paste0('Comparing ', g1, ' and ', g2))
       }
+      ## if insufficient number of marker genes distinguishing two groups, merge
       dg.sig <- compare(dend)
-      if(length(dg.sig)<min.diff.genes) {
+      if(verbose) {
+        print('Differential genes found: ')
+        print(sapply(dg.sig, length))
+      }
+      if(any(sapply(dg.sig, length) < min.diff.genes)) {
         if(verbose) {
           print(paste0('Merging ', g1, ' and ', g2))
         }
@@ -727,6 +728,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
       pv.sig.all[[g1]] <<- dg.sig
       pv.sig.all[[g2]] <<- dg.sig
     } else {
+      ## if only one is leaf, compare to entire other branch
       if(is.leaf(dend[[1]])) {
         g1 <- paste0(labels(dend[[1]]), collapse=".")
         g2 <- paste0(labels(dend[[2]]), collapse=".")
@@ -734,8 +736,12 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           print(paste0('Comparing ', g1, ' and ', g2))
         }
         dg.sig <- compare(dend)
-
-        if(length(dg.sig)<min.diff.genes) {
+        if(verbose) {
+          print('Differential genes found: ')
+          print(sapply(dg.sig, length))
+        }
+        ## if insufficient number of marker genes for leaf, set to NA
+        if(any(sapply(dg.sig, length) < min.diff.genes)) {
           if(verbose) {
             print(paste0('Cannot distinguish ', g1, ' and ', g2))
           }
@@ -752,8 +758,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           print(paste0('Comparing ', g1, ' and ', g2))
         }
         dg.sig <- compare(dend)
-
-        if(length(dg.sig)<min.diff.genes) {
+        if(verbose) {
+          print('Differential genes found: ')
+          print(sapply(dg.sig, length))
+        }
+        if(any(sapply(dg.sig, length) < min.diff.genes)) {
           if(verbose) {
             print(paste0('Cannot distinguish ', g1, ' and ', g2))
           }
@@ -766,10 +775,10 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     }
   }
 
-  ## average within groups
-  i <- 1
+  i <- 1 ## counter
   repeat {
     com <- factor(com)
+    ## average within groups
     mat.summary <- do.call(cbind, lapply(levels(com), function(ct) {
       cells <- which(com==ct)
       rowMeans(matnorm[, cells])
@@ -784,10 +793,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     names(com.fin) <- names(com)
     pv.sig.all <- list()
     pv.recur(dend)
-    #plotEmbedding(emb, com.fin, mark.clusters=TRUE)
-    #print(table(com))
-    #print(table(com.fin))
-    ## converged
+    ## test if converged
     if(i>max.iter) {
       break
     }
@@ -802,172 +808,248 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
 
 }
 
+
+##' Predict LD embedding for new dataset given old model and gene scale factor
+##'
+##' @export
+##'
+predictLds <- function(mat, model, gsf, verbose=TRUE) {
+  gsf.have <- intersect(names(gsf), rownames(mat))
+  if(verbose) {
+    print(paste0('Percentage of features retained: ', length(gsf.have)/length(gsf)))
+  }
+
+  ## fill in with zeros
+  mat.test <- matrix(0, length(gsf), ncol(mat))
+  rownames(mat.test) <- names(gsf)
+  colnames(mat.test) <- colnames(mat)
+  mat.test[gsf.have,] <- as.matrix(mat[gsf.have,])
+
+  pred <- predict(model, data.frame(t(log10(mat.test*gsf+1))))
+}
+
+
+##' Use LDA model posteriors to retain only confident predictions
+##'
+##' @export
+##'
+getConfidentPreds <- function(posterior, t=0.95) {
+  class <- apply(posterior, 1, function(x) {
+    x <- sort(x, decreasing=TRUE)
+    if(x[1]-sum(x[-1]) >= t) {
+      return(names(x)[1])
+    } else {
+      return(NA)
+    }
+  })
+  class <- factor(class)
+  return(class)
+}
+
+
+##' Batch correct within identified groups
+##'
+##' @export
+##'
+clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=10) {
+  com.final <- factor(com.final)
+  lds.bc <- do.call(rbind, lapply(levels(com.final), function(ct){
+    cells <- na.omit(names(com.final)[com.final==ct])
+    batch.cells <- factor(batch[cells])
+    ## correct only if more than N cells per group
+    if(sum(table(batch.cells)>min.group.size)>1) {
+      t(sva::ComBat(t(lds.all[cells,]), batch.cells))
+    } else {
+      lds.all[cells,]
+    }
+  }))
+  return(lds.bc)
+}
+
+
 ##' Run tSNE on LDs from model
 ##'
 ##' @export
 ##'
 tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=FALSE, ...) {
-    if(verbose) {
-        print('Running LDA models ...')
-    }
+  if(verbose) {
+    print('Running LDA models ...')
+  }
 
-    ## compute LDs
-    matm <- t(as.matrix(mat))
-    if(class(model)=='lda') {
-        genes.need <- rownames(model$scaling)
-        mat.temp <- matrix(0, nrow(matm), length(genes.need))
-        rownames(mat.temp) <- rownames(matm)
-        colnames(mat.temp) <- genes.need
-        genes.have <- intersect(genes.need, colnames(matm))
-        mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
-        predict(model, data.frame(mat.temp))$x
-    }
-    if(class(model)=='list') {
-        reduction <- do.call(cbind, lapply(model, function(m) {
-                            genes.need <- rownames(m$scaling)
-                            mat.temp <- matrix(0, nrow(matm), length(genes.need))
-                            rownames(mat.temp) <- rownames(matm)
-                            colnames(mat.temp) <- genes.need
-                            genes.have <- intersect(genes.need, colnames(matm))
-                            mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
-                            predict(m, data.frame(mat.temp))$x
-                       }))
-    }
+  ## compute LDs
+  matm <- t(as.matrix(mat))
+  if(class(model)=='lda') {
+    genes.need <- rownames(model$scaling)
+    mat.temp <- matrix(0, nrow(matm), length(genes.need))
+    rownames(mat.temp) <- rownames(matm)
+    colnames(mat.temp) <- genes.need
+    genes.have <- intersect(genes.need, colnames(matm))
+    mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
+    predict(model, data.frame(mat.temp))$x
+  }
+  if(class(model)=='list') {
+    reduction <- do.call(cbind, lapply(model, function(m) {
+      genes.need <- rownames(m$scaling)
+      mat.temp <- matrix(0, nrow(matm), length(genes.need))
+      rownames(mat.temp) <- rownames(matm)
+      colnames(mat.temp) <- genes.need
+      genes.have <- intersect(genes.need, colnames(matm))
+      mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
+      predict(m, data.frame(mat.temp))$x
+    }))
+  }
 
-    if(verbose) {
-        print(paste0("Running Rtsne with perplexity ", perplexity))
-    }
+  if(verbose) {
+    print(paste0("Running Rtsne with perplexity ", perplexity))
+  }
 
-    ## tSNE
-    emb <- Rtsne::Rtsne(reduction, is_distance=FALSE, perplexity=perplexity, verbose=verbose, num_threads=ncores)$Y
-    rownames(emb) <- colnames(mat)
+  ## tSNE
+  emb <- Rtsne::Rtsne(reduction, is_distance=FALSE, perplexity=perplexity, verbose=verbose, num_threads=ncores)$Y
+  rownames(emb) <- colnames(mat)
 
-    if(plot) {
-        if(do.par) {
-            par(mar = c(0.5,0.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
-        }
-        plotEmbedding(emb, ...)
+  if(plot) {
+    if(do.par) {
+      par(mar = c(0.5,0.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
     }
+    plotEmbedding(emb, ...)
+  }
 
-    if(details) {
-        return(list(
-            emb=emb,
-            reduction=reduction
-        ))
-    } else {
-        return(emb)
-    }
+  if(details) {
+    return(list(
+      emb=emb,
+      reduction=reduction
+    ))
+  } else {
+    return(emb)
+  }
 }
 
 
 ##' Plot 2D embedding
 ##'
+##' @param emb dataframe with x and y coordinates
+##' @param groups factor annotations for rows on emb for visualizing cluster annotations
+##' @param colors color or numeric values for rows on emb for visualizing gene expression
+##' @param cex point size
+##' @param alpha point opacity
+##' @param gradientPalette palette for colors if numeric values provided
+##' @param zlim range for colors
+##' @param s saturation of rainbow for group colors
+##' @param v value of rainbow for group colors
+##' @param min.group.size minimum size of group in order for group to be colored
+##' @param show.legend whether to show legend
+##' @param mark.clusters whether to mark clusters with name of cluster
+##' @param mark.cluster.cex cluster marker point size
+##' @param shuffle.colors whether to shuffle group colors
+##' @param legend.x legend position ie. 'topright', 'topleft', 'bottomleft', 'bottomright'
+##' @param gradient.range.quantile quantile for mapping colors to gradient palette
+##' @param verbose verbosity
+##' @param unclassified.cell.color cells not included in groups will be labeled in this color
+##' @param group.level.colors set group level colors. Default uses rainbow.
+##'
 ##' @export
 ##'
-plotEmbedding <- function(emb, groups=NULL, colors=NULL, do.par=TRUE, cex=0.6, alpha=0.4, gradientPalette=NULL, zlim=NULL, s=1, v=0.8, min.group.size=1, show.legend=FALSE, mark.clusters=FALSE, mark.cluster.cex=2, shuffle.colors=F, legend.x='topright', gradient.range.quantile=0.95, verbose=TRUE, unclassified.cell.color='gray70', group.level.colors=NULL, ...) {
+plotEmbedding <- function(emb, groups=NULL, colors=NULL, cex=0.6, alpha=0.4, gradientPalette=NULL, zlim=NULL, s=1, v=0.8, min.group.size=1, show.legend=FALSE, mark.clusters=FALSE, mark.cluster.cex=2, shuffle.colors=F, legend.x='topright', gradient.range.quantile=0.95, verbose=TRUE, unclassified.cell.color='gray70', group.level.colors=NULL, ...) {
 
-    if(!is.null(colors)) {
-        ## use clusters information
-        if(!all(rownames(emb) %in% names(colors))) { warning("provided cluster vector doesn't list colors for all of the cells; unmatched cells will be shown in gray. ")}
-        if(all(areColors(colors))) {
-            if(verbose) cat("using supplied colors as is\n")
-            cols <- colors[match(rownames(emb),names(colors))]; cols[is.na(cols)] <- unclassified.cell.color;
-            names(cols) <- rownames(emb)
-        } else {
-            if(is.numeric(colors)) { # treat as a gradient
-                if(verbose) cat("treating colors as a gradient")
-                if(is.null(gradientPalette)) { # set up default gradients
-                    if(all(sign(colors)>=0)) {
-                        gradientPalette <- colorRampPalette(c('gray80','red'), space = "Lab")(1024)
-                    } else {
-                        gradientPalette <- colorRampPalette(c("blue", "grey70", "red"), space = "Lab")(1024)
-                    }
-                }
-                if(is.null(zlim)) { # set up value limits
-                    if(all(sign(colors)>=0)) {
-                        zlim <- as.numeric(quantile(colors,p=c(1-gradient.range.quantile,gradient.range.quantile)))
-                        if(diff(zlim)==0) {
-                            zlim <- as.numeric(range(colors))
-                        }
-                    } else {
-                        zlim <- c(-1,1)*as.numeric(quantile(abs(colors),p=gradient.range.quantile))
-                        if(diff(zlim)==0) {
-                            zlim <- c(-1,1)*as.numeric(max(abs(colors)))
-                        }
-                    }
-                }
-                                        # restrict the values
-                colors[colors<zlim[1]] <- zlim[1]; colors[colors>zlim[2]] <- zlim[2];
-
-                if(verbose) cat(' with zlim:',zlim,'\n')
-                colors <- (colors-zlim[1])/(zlim[2]-zlim[1])
-                cols <- gradientPalette[colors[match(rownames(emb),names(colors))]*(length(gradientPalette)-1)+1]
-                names(cols) <- rownames(emb)
-            } else {
-                stop("colors argument must be a cell-named vector of either character colors or numeric values to be mapped to a gradient")
-            }
-        }
+  if(!is.null(colors)) {
+    ## use clusters information
+    if(!all(rownames(emb) %in% names(colors))) { warning("provided cluster vector doesn't list colors for all of the cells; unmatched cells will be shown in gray. ")}
+    if(all(areColors(colors))) {
+      if(verbose) cat("using supplied colors as is\n")
+      cols <- colors[match(rownames(emb),names(colors))]; cols[is.na(cols)] <- unclassified.cell.color;
+      names(cols) <- rownames(emb)
     } else {
-        if(!is.null(groups)) {
-            if(min.group.size>1) { groups[groups %in% levels(groups)[unlist(tapply(groups,groups,length))<min.group.size]] <- NA; groups <- droplevels(groups); }
-            groups <- as.factor(groups)[rownames(emb)]
-            if(verbose) cat("using provided groups as a factor\n")
-            factor.mapping=TRUE;
-            ## set up a rainbow color on the factor
-            factor.colors <- fac2col(groups,s=s,v=v,shuffle=shuffle.colors,min.group.size=min.group.size,unclassified.cell.color=unclassified.cell.color,level.colors=group.level.colors,return.details=T)
-            cols <- factor.colors$colors;
-            names(cols) <- rownames(emb)
-        } else {
-          cols <- rep(unclassified.cell.color, nrow(emb))
-          names(cols) <- rownames(emb)
+      if(is.numeric(colors)) { # treat as a gradient
+        if(verbose) cat("treating colors as a gradient")
+        if(is.null(gradientPalette)) { # set up default gradients
+          if(all(sign(colors)>=0)) {
+            gradientPalette <- colorRampPalette(c('gray80','red'), space = "Lab")(1024)
+          } else {
+            gradientPalette <- colorRampPalette(c("blue", "grey70", "red"), space = "Lab")(1024)
+          }
         }
-    }
+        if(is.null(zlim)) { # set up value limits
+          if(all(sign(colors)>=0)) {
+            zlim <- as.numeric(quantile(colors,p=c(1-gradient.range.quantile,gradient.range.quantile)))
+            if(diff(zlim)==0) {
+              zlim <- as.numeric(range(colors))
+            }
+          } else {
+            zlim <- c(-1,1)*as.numeric(quantile(abs(colors),p=gradient.range.quantile))
+            if(diff(zlim)==0) {
+              zlim <- c(-1,1)*as.numeric(max(abs(colors)))
+            }
+          }
+        }
+        # restrict the values
+        colors[colors<zlim[1]] <- zlim[1]; colors[colors>zlim[2]] <- zlim[2];
 
-    if(do.par) {
-        par(mar = c(0.5,0.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
+        if(verbose) cat(' with zlim:',zlim,'\n')
+        colors <- (colors-zlim[1])/(zlim[2]-zlim[1])
+        cols <- gradientPalette[colors[match(rownames(emb),names(colors))]*(length(gradientPalette)-1)+1]
+        names(cols) <- rownames(emb)
+      } else {
+        stop("colors argument must be a cell-named vector of either character colors or numeric values to be mapped to a gradient")
+      }
     }
-    plot(emb,col=adjustcolor(cols,alpha=alpha),cex=cex,pch=19,axes=F, ...); box();
-    if(mark.clusters) {
-        if(!is.null(groups)) {
-            cent.pos <- do.call(rbind,tapply(1:nrow(emb),groups,function(ii) apply(emb[ii,,drop=F],2,median)))
-            cent.pos <- na.omit(cent.pos);
-            text(cent.pos[,1],cent.pos[,2],labels=rownames(cent.pos),cex=mark.cluster.cex)
-        }
+  } else {
+    if(!is.null(groups)) {
+      if(min.group.size>1) { groups[groups %in% levels(groups)[unlist(tapply(groups,groups,length))<min.group.size]] <- NA; groups <- droplevels(groups); }
+      groups <- as.factor(groups)[rownames(emb)]
+      if(verbose) cat("using provided groups as a factor\n")
+      factor.mapping=TRUE;
+      ## set up a rainbow color on the factor
+      factor.colors <- fac2col(groups,s=s,v=v,shuffle=shuffle.colors,min.group.size=min.group.size,unclassified.cell.color=unclassified.cell.color,level.colors=group.level.colors,return.details=T)
+      cols <- factor.colors$colors;
+      names(cols) <- rownames(emb)
+    } else {
+      cols <- rep(unclassified.cell.color, nrow(emb))
+      names(cols) <- rownames(emb)
     }
-    if(show.legend) {
-        if(factor.mapping) {
-            legend(x=legend.x,pch=rep(19,length(levels(groups))),bty='n',col=factor.colors$palette,legend=names(factor.colors$palette))
-        }
+  }
+
+  plot(emb,col=adjustcolor(cols,alpha=alpha),cex=cex,pch=19,axes=F, ...); box();
+  if(mark.clusters) {
+    if(!is.null(groups)) {
+      cent.pos <- do.call(rbind,tapply(1:nrow(emb),groups,function(ii) apply(emb[ii,,drop=F],2,median)))
+      cent.pos <- na.omit(cent.pos);
+      text(cent.pos[,1],cent.pos[,2],labels=rownames(cent.pos),cex=mark.cluster.cex)
     }
+  }
+  if(show.legend) {
+    if(factor.mapping) {
+      legend(x=legend.x,pch=rep(19,length(levels(groups))),bty='n',col=factor.colors$palette,legend=names(factor.colors$palette))
+    }
+  }
 }
 ## a utility function to translate factor into colors
 fac2col <- function(x,s=1,v=1,shuffle=FALSE,min.group.size=1,return.details=F,unclassified.cell.color='gray50',level.colors=NULL) {
-    x <- as.factor(x);
-    if(min.group.size>1) {
-        x <- factor(x,exclude=levels(x)[unlist(tapply(rep(1,length(x)),x,length))<min.group.size])
-        x <- droplevels(x)
-    }
-    if(is.null(level.colors)) {
-        col <- rainbow(length(levels(x)),s=s,v=v);
-    } else {
-        col <- level.colors[1:length(levels(x))];
-    }
-    names(col) <- levels(x);
+  x <- as.factor(x);
+  if(min.group.size>1) {
+    x <- factor(x,exclude=levels(x)[unlist(tapply(rep(1,length(x)),x,length))<min.group.size])
+    x <- droplevels(x)
+  }
+  if(is.null(level.colors)) {
+    col <- rainbow(length(levels(x)),s=s,v=v);
+  } else {
+    col <- level.colors[1:length(levels(x))];
+  }
+  names(col) <- levels(x);
 
-    if(shuffle) col <- sample(col);
+  if(shuffle) col <- sample(col);
 
-    y <- col[as.integer(x)]; names(y) <- names(x);
-    y[is.na(y)] <- unclassified.cell.color;
-    if(return.details) {
-        return(list(colors=y,palette=col))
-    } else {
-        return(y);
-    }
+  y <- col[as.integer(x)]; names(y) <- names(x);
+  y[is.na(y)] <- unclassified.cell.color;
+  if(return.details) {
+    return(list(colors=y,palette=col))
+  } else {
+    return(y);
+  }
 }
 ## quick utility to check if given character vector is colors
 ## thanks, Josh O'Brien: http://stackoverflow.com/questions/13289009/check-if-character-string-is-a-valid-color-representation
 areColors <- function(x) {
-    is.character(x) & sapply(x, function(X) {tryCatch(is.matrix(col2rgb(X)), error = function(e) FALSE)})
+  is.character(x) & sapply(x, function(X) {tryCatch(is.matrix(col2rgb(X)), error = function(e) FALSE)})
 }
 
 

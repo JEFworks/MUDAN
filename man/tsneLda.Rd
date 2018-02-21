@@ -4,8 +4,8 @@
 \alias{tsneLda}
 \title{Run tSNE on LDs from model}
 \usage{
-tsneLda(mat, model, com, perplexity = 30, verbose = TRUE, plot = TRUE,
-  do.par = TRUE, ncores = 10, ...)
+tsneLda(mat, model, perplexity = 30, verbose = TRUE, plot = TRUE,
+  do.par = TRUE, ncores = 10, details = FALSE, ...)
 }
 \description{
 Run tSNE on LDs from model

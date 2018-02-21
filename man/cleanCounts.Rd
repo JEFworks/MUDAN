@@ -4,11 +4,11 @@
 \alias{cleanCounts}
 \title{Filter counts matrix}
 \usage{
-cleanCounts(counts, min.lib.size = 1000, max.lib.size = 8000,
-  min.reads = 1, min.detected = 1)
+cleanCounts(counts, min.lib.size = 300, max.lib.size = 8000,
+  min.reads = 10, min.detected = 5, verbose = TRUE)
 }
 \arguments{
-\item{counts}{Read count matrix. The rows correspond to genes, columns correspond to individual cells}
+\item{counts}{A read count matrix. The rows correspond to genes, columns correspond to individual cells}
 
 \item{min.lib.size}{Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)}
 
@@ -17,6 +17,8 @@ cleanCounts(counts, min.lib.size = 1000, max.lib.size = 8000,
 \item{min.reads}{Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)}
 
 \item{min.detected}{Minimum number of cells a gene must be seen in. Genes not seen in a sufficient number of cells will be removed (default: 5)}
+
+\item{verbose}{Verbosity (default: TRUE)}
 }
 \value{
 a filtered read count matrix

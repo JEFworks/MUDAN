@@ -4,7 +4,8 @@
 \alias{getPcs}
 \title{Dimensionality reduction by PCA}
 \usage{
-getPcs(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, ...)
+getPcs(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose = TRUE,
+  ...)
 }
 \arguments{
 \item{mat}{Variance normalized gene expression matrix.}
@@ -12,6 +13,8 @@ getPcs(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, ...)
 \item{nGenes}{Number of most variable genes. (default: 1000)}
 
 \item{nPcs}{Number of principal components. (default: 100)}
+
+\item{verbose}{Verbosity (default: TRUE)}
 }
 \value{
 Matrix with columns as cells and rows as principal component eigenvectors.

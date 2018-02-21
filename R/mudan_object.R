@@ -1,6 +1,6 @@
 ##' Mudan object
 ##'
-##' @example
+##' @examples {
 ##' library(MUDAN)
 ##' source('../R/mudan.R')
 ##' data(pbmcA)
@@ -18,6 +18,7 @@
 ##' myMudanObject$plot(communityName='Walktrap', embeddingType='MUDAN')
 ##' myMudanObject$plot(communityName='Infomap', embeddingType='PCA')
 ##' myMudanObject$plot(communityName='Walktrap', embeddingType='PCA')
+##' }
 ##'
 Mudan <- R6::R6Class(
     "Mudan",
