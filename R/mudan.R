@@ -678,7 +678,7 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
 ##'
 ##' @export
 ##'
-getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.group.size=10, min.diff.genes=nrow(cd)*0.005, max.iter=10, verbose=TRUE) {
+getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.group.size=10, min.diff.genes=nrow(cd)*0.005, max.iter=10, verbose=TRUE, plot=FALSE) {
 
   if(min.group.size>1) { com[com %in% levels(com)[unlist(tapply(com,com,length))<min.group.size]] <- NA; com <- droplevels(com); }
   com <- as.factor(com)[colnames(cd)]
@@ -698,7 +698,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
       ## get only significantly upregulated
       x <- x[x$Z>z.threshold,]
       x <- na.omit(x)
-      rownames(x)
+      return(rownames(x))
     })
     #dg.sig <- dg.sig[!grepl('RP|MT', dg.sig)] ## exclude ribosomal and mitochondrial?
     return(dg.sig)
@@ -787,7 +787,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     dim(mat.summary)
     ## cluster groups
     hc <- hclust(dist(t(mat.summary)), method=hclust.method)
-    plot(hc)
+    if(plot) { plot(hc) }
     dend <- as.dendrogram(hc)
     com.fin <- as.character(com)
     names(com.fin) <- names(com)
@@ -804,7 +804,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     i <- i+1
   }
 
-  return(list(com=com.fin, pv.sig=pv.sig.all))
+  return(list(com=com.fin, pv.sig=pv.sig.all, hc=hc, mat.summary=mat.summary))
 
 }
 

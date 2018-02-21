@@ -6,7 +6,7 @@
 \usage{
 getStableClusters(cd, com, matnorm, z.threshold = 3,
   hclust.method = "ward.D", min.group.size = 10, min.diff.genes = nrow(cd)
-  * 0.005, max.iter = 10, verbose = TRUE)
+  * 0.005, max.iter = 10, verbose = TRUE, plot = FALSE)
 }
 \arguments{
 \item{cd}{Counts matrix for differential expression analysis. Rows are genes. Columns are cells.}
