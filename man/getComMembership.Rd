@@ -15,6 +15,8 @@ getComMembership(mat, k, method = igraph::cluster_walktrap, verbose = TRUE,
 \item{method}{Community detection method from igraph. (default: igraph::cluster_walktrap)}
 
 \item{verbose}{Verbosity (default: TRUE)}
+
+\item{details}{Whether to return just community annotation or entended details including graph and graph modularity}
 }
 \value{
 Vector of community annotations

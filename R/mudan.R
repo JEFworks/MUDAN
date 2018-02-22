@@ -48,7 +48,7 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 ##' Normalizes raw counts to log10 counts per million with pseudocount
 ##'
 ##' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
-##' @param pseudocount Pseudocount for log transformation. (default: 1)
+##' @param depthScale Depth scaling. Using a million for CPM (default: e61)
 ##' @param verbose Verbosity (default: TRUE)
 ##'
 ##' @return a normalized matrix
@@ -197,6 +197,7 @@ bh.adjust <- function(x, log = FALSE) {
 ##' @param nGenes Number of most variable genes. (default: 1000)
 ##' @param nPcs Number of principal components. (default: 100)
 ##' @param verbose Verbosity (default: TRUE)
+##' @param ... Additional parameters to pass to irlba
 ##'
 ##' @return Matrix with columns as cells and rows as principal component eigenvectors.
 ##'
@@ -257,6 +258,7 @@ getVariableGenes <- function(mat, nGenes) {
 ##' @param k K-nearest neighbor parameter.
 ##' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
 ##' @param verbose Verbosity (default: TRUE)
+##' @param details Whether to return just community annotation or entended details including graph and graph modularity
 ##'
 ##' @return Vector of community annotations
 ##'
@@ -322,6 +324,7 @@ getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 ##' @param mat Matrix of cells as columns. Features as rows (such as PCs).
 ##' @param k K-nearest neighbor parameter.
 ##' @param nsubsample Number of cells in subset (default: ncol(mat)*0.5)
+##' @param seed Random seed for reproducibility
 ##' @param vote Use neighbor voting system to annotate rest of cells not in subset. If false, will use machine-learning model. (default: FALSE)
 ##' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
 ##' @param verbose Verbosity (default: TRUE)
@@ -400,6 +403,8 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 ##' @param mat Expression matrix with cells as columns, transferable features such as genes as rows.
 ##' @param com Community annotations
 ##' @param verbose Verbosity (default: TRUE)
+##' @param nfeatures Number of features (genes) in LDA model (default: all)
+##' @param random Wehther those features are random of chosen based on variance (most variable will be chosen by default)
 ##' @param retest Whether to retest model for accuracy
 ##'
 ##' @return LDA model
@@ -452,7 +457,7 @@ modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, 
 
 ##' Differential expression analysis (adapted from PAGODA2)
 ##'
-##' @param counts A read count matrix. The rows correspond to genes, columns correspond to individual cells
+##' @param cd A read count matrix. The rows correspond to genes, columns correspond to individual cells
 ##' @param cols Column/cell group annotations. Will perform one vs. all differential expression analysis.
 ##' @param verbose Verbosity
 ##'
@@ -671,9 +676,11 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
 ##' @param com Community/group annotations for cells
 ##' @param matnorm Normalized gene expression matrix for building group relationship tree. Rows are genes. Columns are cells.
 ##' @param z.threshold Z-score threshold for identifying significantly differentially expressed genes
-##' @param hcluster.method Hierarchical clustering method used to construct relationship tree
+##' @param hclust.method Hierarchical clustering method used to construct relationship tree
+##' @param min.group.size Minimum group size for stable cluster
 ##' @param min.diff.genes Minimum number of significantly differentially expressed genes that must be identified or else groups will be merged
 ##' @param max.iter Maximum number of iterations. Will end earlier if convergence reached.
+##' @param plot Whether to plot intermediate plots (hierarchical clustering dendrograms)
 ##' @param verbose Verbosity
 ##'
 ##' @export
@@ -811,6 +818,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
 
 ##' Predict LD embedding for new dataset given old model and gene scale factor
 ##'
+##' @param mat Library-size normalized gene expression matrix
+##' @param model LDA model
+##' @param gsf Gene scale factor to be applied to mat (so mat must not be variance normalized)
+##' @param verbose Verbosity
+##'
 ##' @export
 ##'
 predictLds <- function(mat, model, gsf, verbose=TRUE) {
@@ -831,6 +843,9 @@ predictLds <- function(mat, model, gsf, verbose=TRUE) {
 
 ##' Use LDA model posteriors to retain only confident predictions
 ##'
+##' @param posterior Posterior probabilities from LDA
+##' @param t Posteriors below this threshold are set to NA
+##'
 ##' @export
 ##'
 getConfidentPreds <- function(posterior, t=0.95) {
@@ -847,8 +862,12 @@ getConfidentPreds <- function(posterior, t=0.95) {
 }
 
 
-##' Batch correct within identified groups
+##' Batch correct within identified groups using ComBat
 ##'
+##' @param lds.all Matrix to be batch corrected
+##' @param batch Batch factor annotations
+##' @param com.final Group annotations
+##' @param min.group.size Minimum number of cells in a group in order to batch correct
 ##' @export
 ##'
 clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=10) {
@@ -868,6 +887,16 @@ clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=1
 
 
 ##' Run tSNE on LDs from model
+##'
+##' @param mat Normalized matrix
+##' @param model LDA model
+##' @param perplexity Perplexity parameter for tSNE
+##' @param verbose Verbosity
+##' @param plot Whether to plot
+##' @param do.par Whether to set plot margins
+##' @param ncores Number of cores for paralele tSNE
+##' @param details Whether to return details
+##' @param ... Additional parameters to pass to plot
 ##'
 ##' @export
 ##'
@@ -946,6 +975,7 @@ tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=T
 ##' @param verbose verbosity
 ##' @param unclassified.cell.color cells not included in groups will be labeled in this color
 ##' @param group.level.colors set group level colors. Default uses rainbow.
+##' @param ... Additional parameters to pass to BASE::plot
 ##'
 ##' @export
 ##'

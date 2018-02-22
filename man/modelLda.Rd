@@ -12,6 +12,10 @@ modelLda(mat, com, nfeatures = nrow(mat), random = FALSE, verbose = TRUE,
 
 \item{com}{Community annotations}
 
+\item{nfeatures}{Number of features (genes) in LDA model (default: all)}
+
+\item{random}{Wehther those features are random of chosen based on variance (most variable will be chosen by default)}
+
 \item{verbose}{Verbosity (default: TRUE)}
 
 \item{retest}{Whether to retest model for accuracy}

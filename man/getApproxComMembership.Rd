@@ -17,6 +17,8 @@ getApproxComMembership(mat, k, nsubsample = ncol(mat) * 0.5,
 
 \item{method}{Community detection method from igraph. (default: igraph::cluster_walktrap)}
 
+\item{seed}{Random seed for reproducibility}
+
 \item{vote}{Use neighbor voting system to annotate rest of cells not in subset. If false, will use machine-learning model. (default: FALSE)}
 
 \item{verbose}{Verbosity (default: TRUE)}

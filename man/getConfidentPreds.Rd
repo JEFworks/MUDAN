@@ -6,6 +6,11 @@
 \usage{
 getConfidentPreds(posterior, t = 0.95)
 }
+\arguments{
+\item{posterior}{Posterior probabilities from LDA}
+
+\item{t}{Posteriors below this threshold are set to NA}
+}
 \description{
 Use LDA model posteriors to retain only confident predictions
 }

@@ -17,13 +17,17 @@ getStableClusters(cd, com, matnorm, z.threshold = 3,
 
 \item{z.threshold}{Z-score threshold for identifying significantly differentially expressed genes}
 
+\item{hclust.method}{Hierarchical clustering method used to construct relationship tree}
+
+\item{min.group.size}{Minimum group size for stable cluster}
+
 \item{min.diff.genes}{Minimum number of significantly differentially expressed genes that must be identified or else groups will be merged}
 
 \item{max.iter}{Maximum number of iterations. Will end earlier if convergence reached.}
 
 \item{verbose}{Verbosity}
 
-\item{hcluster.method}{Hierarchical clustering method used to construct relationship tree}
+\item{plot}{Whether to plot intermediate plots (hierarchical clustering dendrograms)}
 }
 \description{
 Iterative merging of clusters along tree until stable

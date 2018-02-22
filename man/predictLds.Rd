@@ -6,6 +6,15 @@
 \usage{
 predictLds(mat, model, gsf, verbose = TRUE)
 }
+\arguments{
+\item{mat}{Library-size normalized gene expression matrix}
+
+\item{model}{LDA model}
+
+\item{gsf}{Gene scale factor to be applied to mat (so mat must not be variance normalized)}
+
+\item{verbose}{Verbosity}
+}
 \description{
 Predict LD embedding for new dataset given old model and gene scale factor
 }

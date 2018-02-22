@@ -7,11 +7,11 @@
 getDifferentialGenes(cd, cols, verbose = TRUE)
 }
 \arguments{
+\item{cd}{A read count matrix. The rows correspond to genes, columns correspond to individual cells}
+
 \item{cols}{Column/cell group annotations. Will perform one vs. all differential expression analysis.}
 
 \item{verbose}{Verbosity}
-
-\item{counts}{A read count matrix. The rows correspond to genes, columns correspond to individual cells}
 }
 \description{
 Differential expression analysis (adapted from PAGODA2)

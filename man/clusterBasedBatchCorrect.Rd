@@ -2,10 +2,19 @@
 % Please edit documentation in R/mudan.R
 \name{clusterBasedBatchCorrect}
 \alias{clusterBasedBatchCorrect}
-\title{Batch correct within identified groups}
+\title{Batch correct within identified groups using ComBat}
 \usage{
 clusterBasedBatchCorrect(lds.all, batch, com.final, min.group.size = 10)
 }
+\arguments{
+\item{lds.all}{Matrix to be batch corrected}
+
+\item{batch}{Batch factor annotations}
+
+\item{com.final}{Group annotations}
+
+\item{min.group.size}{Minimum number of cells in a group in order to batch correct}
+}
 \description{
-Batch correct within identified groups
+Batch correct within identified groups using ComBat
 }

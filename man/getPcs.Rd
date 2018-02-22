@@ -15,6 +15,8 @@ getPcs(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose = TRUE,
 \item{nPcs}{Number of principal components. (default: 100)}
 
 \item{verbose}{Verbosity (default: TRUE)}
+
+\item{...}{Additional parameters to pass to irlba}
 }
 \value{
 Matrix with columns as cells and rows as principal component eigenvectors.

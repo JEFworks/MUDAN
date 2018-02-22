@@ -1,8 +1,7 @@
-##' Mudan object
+##' R6 object for storing all relevant output from MUDAN analysis in single entity
 ##'
 ##' @examples {
 ##' library(MUDAN)
-##' source('../R/mudan.R')
 ##' data(pbmcA)
 ##' myMudanObject <- Mudan$new("PBMC", pbmcA)
 ##' myMudanObject$libSizeNormalize()
@@ -19,6 +18,8 @@
 ##' myMudanObject$plot(communityName='Infomap', embeddingType='PCA')
 ##' myMudanObject$plot(communityName='Walktrap', embeddingType='PCA')
 ##' }
+##'
+##' @export
 ##'
 Mudan <- R6::R6Class(
     "Mudan",

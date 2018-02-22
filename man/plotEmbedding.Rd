@@ -49,6 +49,8 @@ plotEmbedding(emb, groups = NULL, colors = NULL, cex = 0.6, alpha = 0.4,
 \item{unclassified.cell.color}{cells not included in groups will be labeled in this color}
 
 \item{group.level.colors}{set group level colors. Default uses rainbow.}
+
+\item{...}{Additional parameters to pass to BASE::plot}
 }
 \description{
 Plot 2D embedding

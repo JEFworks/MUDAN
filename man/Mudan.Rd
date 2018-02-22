@@ -3,18 +3,17 @@
 \docType{data}
 \name{Mudan}
 \alias{Mudan}
-\title{Mudan object}
+\title{R6 object for storing all relevant output from MUDAN analysis in single entity}
 \format{An object of class \code{R6ClassGenerator} of length 24.}
 \usage{
 Mudan
 }
 \description{
-Mudan object
+R6 object for storing all relevant output from MUDAN analysis in single entity
 }
 \examples{
 {
 library(MUDAN)
-source('../R/mudan.R')
 data(pbmcA)
 myMudanObject <- Mudan$new("PBMC", pbmcA)
 myMudanObject$libSizeNormalize()

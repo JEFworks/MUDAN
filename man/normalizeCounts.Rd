@@ -9,9 +9,9 @@ normalizeCounts(counts, depthScale = 1e+06, verbose = TRUE)
 \arguments{
 \item{counts}{Read count matrix. The rows correspond to genes, columns correspond to individual cells}
 
-\item{verbose}{Verbosity (default: TRUE)}
+\item{depthScale}{Depth scaling. Using a million for CPM (default: e61)}
 
-\item{pseudocount}{Pseudocount for log transformation. (default: 1)}
+\item{verbose}{Verbosity (default: TRUE)}
 }
 \value{
 a normalized matrix

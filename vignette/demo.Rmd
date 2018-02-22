@@ -31,8 +31,7 @@ library(MUDAN)
 ```{r}
 data(pbmcA) ## load built in 10X pbmcA dataset
 ## downsample for testing purposes only
-#pbmcA <- as.matrix(pbmcA[, 1:1000]) 
-pbmcA <- as.matrix(pbmcA)
+pbmcA <- as.matrix(pbmcA[, 1:2000]) 
 
 start_time <- Sys.time()
 
@@ -92,7 +91,7 @@ com <- getComMembership(pcs,
 
 ## get stable clusters
 stable <- getStableClusters(cd, com, matnorm, 
-                            min.group.size=10, min.diff.genes=10, 
+                            min.group.size=10, min.diff.genes=5, 
                             z.threshold=1.96, 
                             verbose=FALSE, plot=FALSE)
 
@@ -167,8 +166,7 @@ plotEmbedding(emb.lds, groups=class,
 ## load new dataset
 data(pbmcC)
 ## downsample for testing purposes only
-#pbmcC <- as.matrix(pbmcC[, 1:1000]) 
-pbmcC <- as.matrix(pbmcC)
+pbmcC <- as.matrix(pbmcC[, 1:2000]) 
 
 ## combine with old dataset
 cds <- list(pbmcA, pbmcC)
