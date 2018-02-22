@@ -12,9 +12,7 @@ env:
     - _R_CHECK_TIMINGS_="0"  ## get the timing information for the examples for all of your functions
 
 r:
- - oldrel
  - release
- - devel
 
 # do not build vignettes...takes too long and times out on travis
 r_build_args: --no-build-vignettes --no-manual
@@ -24,6 +22,10 @@ r_check_args: --no-build-vignettes --no-manual --timings
 r_github_packages:
   - JEFworks/MUDAN
 
+# for codecov
+r_packages:
+  - covr
+  
 # we need to install BiocInstaller for testing Bioconductor packages
 bioc_required: true
 
