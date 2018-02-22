@@ -41,7 +41,8 @@ transcriptome-wide expectation as determined by local regression on expression m
 \examples{
 {
 data(pbmcA)
-mat <- cleanCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- cleanCounts(cd)
 mat <- normalizeVariance(mat)
 }
 

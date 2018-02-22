@@ -29,7 +29,8 @@ Identifies components that maximally discriminate among groups using a linear di
 \examples{
 {
 data(pbmcA)
-mat <- cleanCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- cleanCounts(cd)
 mat <- normalizeVariance(mat)
 pcs <- getPcs(mat)
 com <- getComMembership(pcs, k=30)

@@ -13,8 +13,8 @@
 #'
 #' @examples {
 #' data(pbmcA)
-#' dim(pbmcA)
-#' mat <- cleanCounts(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' mat <- cleanCounts(cd)
 #' dim(mat)
 #' }
 #'
@@ -55,7 +55,8 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 #'
 #' @examples {
 #' data(pbmcA)
-#' mat <- normalizeCounts(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' mat <- normalizeCounts(cd)
 #' }
 #'
 #' @export
@@ -94,7 +95,8 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 #'
 #' @examples {
 #' data(pbmcA)
-#' mat <- cleanCounts(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' mat <- cleanCounts(cd)
 #' mat <- normalizeVariance(mat)
 #' }
 #'
@@ -204,7 +206,8 @@ bh.adjust <- function(x, log = FALSE) {
 #'
 #' @examples {
 #' data(pbmcA)
-#' mat <- cleanCounts(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' mat <- cleanCounts(cd)
 #' mat <- normalizeVariance(mat)
 #' pcs <- getPcs(mat)
 #' }
@@ -283,7 +286,8 @@ getVariableGenes <- function(mat, nGenes) {
 #'
 #' @examples {
 #' data(pbmcA)
-#' mat <- cleanCounts(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' mat <- cleanCounts(cd)
 #' mat <- normalizeVariance(mat)
 #' pcs <- getPcs(mat)
 #' com <- getComMembership(pcs, k=30)
@@ -352,7 +356,8 @@ getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 #'
 #' @examples {
 #' data(pbmcA)
-#' mat <- cleanCounts(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' mat <- cleanCounts(cd)
 #' mat <- normalizeVariance(mat)
 #' pcs <- getPcs(mat)
 #' com <- getApproxComMembership(pcs, k=30)
@@ -430,7 +435,8 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 #'
 #' @examples {
 #' data(pbmcA)
-#' mat <- cleanCounts(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' mat <- cleanCounts(cd)
 #' mat <- normalizeVariance(mat)
 #' pcs <- getPcs(mat)
 #' com <- getComMembership(pcs, k=30)

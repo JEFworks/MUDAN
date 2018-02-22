@@ -33,7 +33,8 @@ For when getComMembership takes too long due to there being too many cells
 \examples{
 {
 data(pbmcA)
-mat <- cleanCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- cleanCounts(cd)
 mat <- normalizeVariance(mat)
 pcs <- getPcs(mat)
 com <- getApproxComMembership(pcs, k=30)

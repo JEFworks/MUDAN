@@ -22,7 +22,8 @@ Normalizes raw counts to log10 counts per million with pseudocount
 \examples{
 {
 data(pbmcA)
-mat <- normalizeCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- normalizeCounts(cd)
 }
 
 }

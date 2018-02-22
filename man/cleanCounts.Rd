@@ -29,8 +29,8 @@ Filter counts matrix based on gene and cell requirements
 \examples{
 {
 data(pbmcA)
-dim(pbmcA)
-mat <- cleanCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- cleanCounts(cd)
 dim(mat)
 }
 

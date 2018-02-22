@@ -27,7 +27,8 @@ Dimensionality reduction using PCA by computing principal components using highl
 \examples{
 {
 data(pbmcA)
-mat <- cleanCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- cleanCounts(cd)
 mat <- normalizeVariance(mat)
 pcs <- getPcs(mat)
 }

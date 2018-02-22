@@ -3,7 +3,8 @@
 #' @examples {
 #' library(MUDAN)
 #' data(pbmcA)
-#' myMudanObject <- Mudan$new("PBMC", pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' myMudanObject <- Mudan$new("PBMCA", cd)
 #' myMudanObject$libSizeNormalize()
 #' myMudanObject$varianceNormalize(plot=TRUE)
 #' myMudanObject$dimensionalityReduction(maxit=1000)

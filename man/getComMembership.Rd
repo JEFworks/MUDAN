@@ -27,7 +27,8 @@ Group cells into clusters based on graph-based community detection on approximat
 \examples{
 {
 data(pbmcA)
-mat <- cleanCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- cleanCounts(cd)
 mat <- normalizeVariance(mat)
 pcs <- getPcs(mat)
 com <- getComMembership(pcs, k=30)
