@@ -31,13 +31,13 @@ Group cells into clusters based on graph-based community detection on approximat
 For when getComMembership takes too long due to there being too many cells
 }
 \examples{
-{
+\dontrun{
 data(pbmcA)
-cd <- pbmcA[, 1:500]
+cd <- pbmcA
 mat <- cleanCounts(cd)
 mat <- normalizeVariance(mat)
 pcs <- getPcs(mat)
-com <- getApproxComMembership(pcs, k=30)
+com <- getApproxComMembership(pcs, k=30, getApproxComMembership=1000)
 }
 
 }
