@@ -1,6 +1,6 @@
 # MUDAN
 
-<img src="docs/img/mudan_logo.png" width=128px>
+<img src="docs/assets/img/logo.png" width=128px>
 
 ### *Multi-sample Unified Discriminant ANalysis*
 
@@ -24,21 +24,21 @@ To analyze multiple single-cell RNA-seq samples in a coherent manner in order to
 ### Enhanced visualizations
 - Detected clusters are artificially separated for visualization purposes only
 
-<img src="docs/img/visualization.png" width=500px>
+<img src="docs/assets/img/visualization.png" width=500px>
 
 ### Fast subpopulation detection and characterization
 - Graph-based community detection to identify subpopulations
 - Stability analysis to ensure transcriptionally distinct subpopulations
 - Differential gene expression and marker selection functionalities
 
-<img src="docs/img/stability.png" width=500px>
-<img src="docs/img/diffexp.png" width=500px>
+<img src="docs/assets/img/stability.png" width=500px>
+<img src="docs/assets/img/diffexp.png" width=500px>
 
 ### Multi-sample clustering
 - Preserves variation observed in each sample
 - Ideal for when samples may differ in cell type composition
 
-<img src="docs/img/batch.png" width=500px>
+<img src="docs/assets/img/batch.png" width=500px>
 
 ### Please see [the vignettes](https://github.com/JEFworks/MUDAN/tree/master/vignette) for more information
 
