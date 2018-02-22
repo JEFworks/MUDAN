@@ -354,13 +354,13 @@ getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 #'
 #' @return Vector of community annotations
 #'
-#' @examples {
+#' @examples \dontrun{
 #' data(pbmcA)
-#' cd <- pbmcA[, 1:500]
+#' cd <- pbmcA
 #' mat <- cleanCounts(cd)
 #' mat <- normalizeVariance(mat)
 #' pcs <- getPcs(mat)
-#' com <- getApproxComMembership(pcs, k=30)
+#' com <- getApproxComMembership(pcs, k=30, getApproxComMembership=1000)
 #' }
 #'
 #' @export
@@ -747,7 +747,9 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
         print('Differential genes found: ')
         print(sapply(dg.sig, length))
       }
-      if(any(sapply(dg.sig, length) < min.diff.genes)) {
+      ## both leaves need markers
+      #if(any(sapply(dg.sig, length) < min.diff.genes)) {
+      if(length(unlist(dg.sig)) < min.diff.genes) {
         if(verbose) {
           print(paste0('Merging ', g1, ' and ', g2))
         }
@@ -770,7 +772,9 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           print(sapply(dg.sig, length))
         }
         ## if insufficient number of marker genes for leaf, set to NA
-        if(any(sapply(dg.sig, length) < min.diff.genes)) {
+        #if(any(sapply(dg.sig, length) < min.diff.genes)) {
+        #if(length(unlist(dg.sig)) < min.diff.genes) {
+        if(length(dg.sig[[labels(dend[[1]])]]) < min.diff.genes) {
           if(verbose) {
             print(paste0('Cannot distinguish ', g1, ' and ', g2))
           }
@@ -791,7 +795,9 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           print('Differential genes found: ')
           print(sapply(dg.sig, length))
         }
-        if(any(sapply(dg.sig, length) < min.diff.genes)) {
+        #if(any(sapply(dg.sig, length) < min.diff.genes)) {
+        #if(length(unlist(dg.sig)) < min.diff.genes) {
+        if(length(dg.sig[[labels(dend[[2]])]]) < min.diff.genes) {
           if(verbose) {
             print(paste0('Cannot distinguish ', g1, ' and ', g2))
           }

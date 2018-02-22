@@ -16,7 +16,7 @@ opts_chunk$set(
     cache.path = 'cache/',
     cache = TRUE,
     dev = 'png',
-    dpi=100, fig.width=6, fig.height=3
+    dpi=100, fig.width=8, fig.height=4
 )
 ```
 
@@ -86,12 +86,12 @@ invisible(lapply(marker.genes, function(g) {
 ```{r}
 ## graph-based community detection; over cluster with small k
 com <- getComMembership(pcs, 
-                        k=15, method=igraph::cluster_infomap, 
+                        k=10, method=igraph::cluster_infomap, 
                         verbose=FALSE) 
 
 ## get stable clusters
 stable <- getStableClusters(cd, com, matnorm, 
-                            min.group.size=10, min.diff.genes=5, 
+                            min.group.size=10, min.diff.genes=10, 
                             z.threshold=1.96, 
                             verbose=FALSE, plot=FALSE)
 
@@ -191,7 +191,7 @@ emb.all <- Rtsne::Rtsne(pcs.all,
                         is_distance=FALSE, 
                         perplexity=30, 
                         num_threads=parallel::detectCores(), 
-                        verbose=TRUE)$Y 
+                        verbose=FALSE)$Y 
 rownames(emb.all) <- rownames(pcs.all)
 ```
 
@@ -202,7 +202,7 @@ emb.all.bc <- Rtsne::Rtsne(pcs.all.bc,
                            is_distance=FALSE, 
                            perplexity=30, 
                            num_threads=parallel::detectCores(), 
-                           verbose=TRUE)$Y
+                           verbose=FALSE)$Y
 rownames(emb.all.bc) <- rownames(pcs.all.bc)
 ```
 
@@ -230,25 +230,6 @@ plotEmbedding(emb.lds.bc, com.final,
 plotEmbedding(emb.lds.bc, batch,
               main="MUDAN with batch annotations", 
               alpha=0.1, show.legend=TRUE, legend.x = "topleft")
-
-## regular batch corrected
-plotEmbedding(emb.all.bc, com.final,
-              main="Batch-corrected PCA with combined annotations", 
-              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
-plotEmbedding(emb.all.bc, batch, 
-              main="Batch-corrected PCA with batch annotations", 
-              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
-
-## no batch correction
-plotEmbedding(emb.all, com.final,
-              main="PCA with combined annotations", 
-              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
-plotEmbedding(emb.all, batch, 
-              main="PCA with batch annotations", 
-              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
-```
-
-```{r}
 ## plot expression of marker genes
 par(mfrow=c(2,3), mar=c(0.5,0.5,2,0.5))
 invisible(lapply(marker.genes, function(g) {
@@ -258,4 +239,104 @@ invisible(lapply(marker.genes, function(g) {
                 alpha=0.1, 
                 verbose=FALSE) 
 }))
+```
+
+When no batch correction, shows obvious batch differences.
+
+```{r}
+par(mfrow=c(1,2), mar=c(0.5,0.5,2,0.5))
+## no batch correction
+plotEmbedding(emb.all, com.final,
+              main="PCA with combined annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+plotEmbedding(emb.all, batch, 
+              main="PCA with batch annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+## plot expression of marker genes
+par(mfrow=c(2,3), mar=c(0.5,0.5,2,0.5))
+invisible(lapply(marker.genes, function(g) {
+  gcol <- cds.all[g,] ## plot a gene
+  plotEmbedding(emb.all, color=gcol, 
+                main=g, xlab=NA, ylab=NA, 
+                alpha=0.1, 
+                verbose=FALSE) 
+}))
+```
+
+Regular batch correction is still insufficient, especially for smaller subpopulations.
+
+```{r}
+par(mfrow=c(1,2), mar=c(0.5,0.5,2,0.5))
+## regular batch corrected
+plotEmbedding(emb.all.bc, com.final,
+              main="Batch-corrected PCA with combined annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+plotEmbedding(emb.all.bc, batch, 
+              main="Batch-corrected PCA with batch annotations", 
+              alpha=0.1, show.legend=TRUE, legend.x = "topleft")
+## plot expression of marker genes
+par(mfrow=c(2,3), mar=c(0.5,0.5,2,0.5))
+invisible(lapply(marker.genes, function(g) {
+  gcol <- cds.all[g,] ## plot a gene
+  plotEmbedding(emb.all.bc, color=gcol, 
+                main=g, xlab=NA, ylab=NA, 
+                alpha=0.1, 
+                verbose=FALSE) 
+}))
+```
+
+(5) Reference annotation
+
+```{r}
+## load sorted data with known cell-type annotations from sorting
+data(referenceCounts)
+data(referenceAnnot)
+
+## standard analysis to see how sorted annotations compare with unbiased analysis
+mat.reference <- normalizeCounts(referenceCounts)
+matnorm.info.reference <- normalizeVariance(mat.reference, 
+                                  details=TRUE, 
+                                  verbose=FALSE) 
+matnorm.reference <- log10(matnorm.info.reference$mat+1) 
+pcs.reference <- getPcs(matnorm.reference[matnorm.info.reference$ods,], 
+              nGenes=length(matnorm.info.reference$ods), 
+              nPcs=30, 
+              verbose=FALSE) 
+emb.reference <- Rtsne::Rtsne(pcs.reference, 
+                    is_distance=FALSE, 
+                    perplexity=30, 
+                    num_threads=parallel::detectCores(), 
+                    verbose=FALSE)$Y 
+rownames(emb.reference) <- rownames(pcs.reference)
+```
+
+```{r}
+## get marker genes
+dg.reference <- getDifferentialGenes(referenceCounts, referenceAnnot)
+dg.reference.sig <- lapply(dg.reference, function(x) {
+  x <- na.omit(x)
+  x <- x[x$Z>3,]
+  x <- x[x$highest,]
+  rownames(x)
+})
+
+## train LDA using known annotations from sorting
+model.reference <- modelLda(matnorm.reference[unlist(dg.reference.sig),], referenceAnnot, retest=TRUE)
+
+## apply classifier to new data
+gsf <- matnorm.info.reference$df$gsf
+names(gsf) <- rownames(matnorm.info.reference$df)
+reference.pred <- predictLds(mat.all, model.reference, gsf)
+reference.com <- getConfidentPreds(reference.pred$posterior)
+
+## plot
+par(mfrow=c(1,2), mar=c(0.5,0.5,2,0.5))
+plotEmbedding(emb.reference, referenceAnnot, 
+              main="Reference", 
+              alpha=0.1, xlab=NA, ylab=NA,
+              show.legend=TRUE, legend.x = "topleft")
+plotEmbedding(emb.lds.bc, reference.com, 
+              main="MUDAN with predicted annotations", 
+              alpha=0.1, xlab=NA, ylab=NA,
+              show.legend=TRUE, legend.x = "topleft")
 ```
