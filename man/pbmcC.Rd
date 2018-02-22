@@ -4,7 +4,7 @@
 \name{pbmcC}
 \alias{pbmcC}
 \title{Frozen PBMCs (Donor C)}
-\format{An object of class \code{dgTMatrix} with 16144 rows and 9493 columns.}
+\format{An object of class \code{matrix} with 16144 rows and 9493 columns.}
 \source{
 \url{https://support.10xgenomics.com/single-cell-gene-expression/datasets}
 }

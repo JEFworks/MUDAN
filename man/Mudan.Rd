@@ -25,10 +25,10 @@ myMudanObject$modelCommunity()
 myMudanObject$getMudanEmbedding(plot=FALSE)
 myMudanObject$getStandardEmbedding(plot=FALSE)
 par(mfrow=c(2,2))
-myMudanObject$plot(communityName='Infomap', embeddingType='MUDAN')
-myMudanObject$plot(communityName='Walktrap', embeddingType='MUDAN')
-myMudanObject$plot(communityName='Infomap', embeddingType='PCA')
-myMudanObject$plot(communityName='Walktrap', embeddingType='PCA')
+myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='MUDAN')
+myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='MUDAN')
+myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='PCA')
+myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='PCA')
 }
 
 }

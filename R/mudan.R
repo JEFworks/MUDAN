@@ -1,25 +1,25 @@
-##' Filter counts matrix
-##'
-##' Filter counts matrix based on gene and cell requirements
-##'
-##' @param counts A read count matrix. The rows correspond to genes, columns correspond to individual cells
-##' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)
-##' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
-##' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
-##' @param min.detected Minimum number of cells a gene must be seen in. Genes not seen in a sufficient number of cells will be removed (default: 5)
-##' @param verbose Verbosity (default: TRUE)
-##'
-##' @return a filtered read count matrix
-##'
-##' @examples {
-##' data(pbmcA)
-##' dim(pbmcA)
-##' mat <- cleanCounts(pbmcA)
-##' dim(mat)
-##' }
-##'
-##' @export
-##'
+#' Filter counts matrix
+#'
+#' Filter counts matrix based on gene and cell requirements
+#'
+#' @param counts A read count matrix. The rows correspond to genes, columns correspond to individual cells
+#' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)
+#' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
+#' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
+#' @param min.detected Minimum number of cells a gene must be seen in. Genes not seen in a sufficient number of cells will be removed (default: 5)
+#' @param verbose Verbosity (default: TRUE)
+#'
+#' @return a filtered read count matrix
+#'
+#' @examples {
+#' data(pbmcA)
+#' dim(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' dim(mat)
+#' }
+#'
+#' @export
+#'
 cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 10, min.detected = 5, verbose=TRUE) {
 
   if(verbose) {
@@ -43,23 +43,23 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 }
 
 
-##' Normalizes counts to CPM
-##'
-##' Normalizes raw counts to log10 counts per million with pseudocount
-##'
-##' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
-##' @param depthScale Depth scaling. Using a million for CPM (default: e61)
-##' @param verbose Verbosity (default: TRUE)
-##'
-##' @return a normalized matrix
-##'
-##' @examples {
-##' data(pbmcA)
-##' mat <- counts2cpms(pbmcA)
-##' }
-##'
-##' @export
-##'
+#' Normalizes counts to CPM
+#'
+#' Normalizes raw counts to log10 counts per million with pseudocount
+#'
+#' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
+#' @param depthScale Depth scaling. Using a million for CPM (default: e61)
+#' @param verbose Verbosity (default: TRUE)
+#'
+#' @return a normalized matrix
+#'
+#' @examples {
+#' data(pbmcA)
+#' mat <- normalizeCounts(pbmcA)
+#' }
+#'
+#' @export
+#'
 normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 
   if(verbose) {
@@ -73,35 +73,35 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 }
 
 
-##' Normalize gene expression variance relative to transcriptome-wide expectations
-##' (Modified from SCDE/PAGODA2 code)
-##'
-##' Normalizes gene expression magnitudes to with respect to its ratio to the
-##' transcriptome-wide expectation as determined by local regression on expression magnitude
-##'
-##' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
-##' @param gam.k Generalized additive model parameter; the dimension of the basis used to represent the smooth term (default: 5)
-##' @param alpha Significance threshold (default: 0.05)
-##' @param plot Whether to plot the results (default: FALSE)
-##' @param use.unadjusted.pvals If true, will apply BH correction (default: FALSE)
-##' @param do.par Whether to adjust par for plotting if plotting (default: TRUE)
-##' @param max.adjusted.variance Ceiling on maximum variance after normalization to prevent infinites (default: 1e3)
-##' @param min.adjusted.variance Floor on minimum variance after normalization (default: 1e-3)
-##' @param verbose Verbosity (default: TRUE)
-##' @param details If true, will return data frame of normalization parameters. Else will return normalized matrix.(default: FALSE)
-##'
-##' @return If details is true, will return data frame of normalization parameters. Else will return normalized matrix.
-##'
-##' @examples {
-##' data(pbmcA)
-##' mat <- cleanCounts(pbmcA)
-##' mat <- normalizeVariance(mat)
-##' }
-##'
-##' @importFrom mgcv s
-##'
-##' @export
-##'
+#' Normalize gene expression variance relative to transcriptome-wide expectations
+#' (Modified from SCDE/PAGODA2 code)
+#'
+#' Normalizes gene expression magnitudes to with respect to its ratio to the
+#' transcriptome-wide expectation as determined by local regression on expression magnitude
+#'
+#' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
+#' @param gam.k Generalized additive model parameter; the dimension of the basis used to represent the smooth term (default: 5)
+#' @param alpha Significance threshold (default: 0.05)
+#' @param plot Whether to plot the results (default: FALSE)
+#' @param use.unadjusted.pvals If true, will apply BH correction (default: FALSE)
+#' @param do.par Whether to adjust par for plotting if plotting (default: TRUE)
+#' @param max.adjusted.variance Ceiling on maximum variance after normalization to prevent infinites (default: 1e3)
+#' @param min.adjusted.variance Floor on minimum variance after normalization (default: 1e-3)
+#' @param verbose Verbosity (default: TRUE)
+#' @param details If true, will return data frame of normalization parameters. Else will return normalized matrix.(default: FALSE)
+#'
+#' @return If details is true, will return data frame of normalization parameters. Else will return normalized matrix.
+#'
+#' @examples {
+#' data(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' mat <- normalizeVariance(mat)
+#' }
+#'
+#' @importFrom mgcv s
+#'
+#' @export
+#'
 normalizeVariance <- function(counts, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
   mat <- t(counts) ## make rows as cells, cols as genes
 
@@ -190,27 +190,27 @@ bh.adjust <- function(x, log = FALSE) {
 }
 
 
-##' Dimensionality reduction by PCA
-##'
-##' Dimensionality reduction using PCA by computing principal components using highly variable genes
-##'
-##' @param mat Variance normalized gene expression matrix.
-##' @param nGenes Number of most variable genes. (default: 1000)
-##' @param nPcs Number of principal components. (default: 100)
-##' @param verbose Verbosity (default: TRUE)
-##' @param ... Additional parameters to pass to irlba
-##'
-##' @return Matrix with columns as cells and rows as principal component eigenvectors.
-##'
-##' @examples {
-##' data(pbmcA)
-##' mat <- cleanCounts(pbmcA)
-##' mat <- normalizeVariance(mat)
-##' pcs <- getPcs(mat)
-##' }
-##'
-##' @export
-##'
+#' Dimensionality reduction by PCA
+#'
+#' Dimensionality reduction using PCA by computing principal components using highly variable genes
+#'
+#' @param mat Variance normalized gene expression matrix.
+#' @param nGenes Number of most variable genes. (default: 1000)
+#' @param nPcs Number of principal components. (default: 100)
+#' @param verbose Verbosity (default: TRUE)
+#' @param ... Additional parameters to pass to irlba
+#'
+#' @return Matrix with columns as cells and rows as principal component eigenvectors.
+#'
+#' @examples {
+#' data(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' mat <- normalizeVariance(mat)
+#' pcs <- getPcs(mat)
+#' }
+#'
+#' @export
+#'
 getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE, ...) {
   if(class(mat)!='matrix') {
     mat <- as.matrix(mat)
@@ -234,6 +234,16 @@ getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE,
 
   return(t(m))
 }
+#' Derive principal components by SVD
+#'
+#' @param m Matrix X
+#' @param nPcs Number of principal components
+#' @param tol irlba tol
+#' @param scale Scale input
+#' @param center Center input
+#'
+#' @export
+#'
 fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=TRUE, ...) {
   if(scale||center) {
     m <- scale(m, scale=scale, center=center)
@@ -243,6 +253,13 @@ fastPca <- function(m, nPcs=2, tol=1e-10, scale=FALSE, center=TRUE, ...) {
 
   return(a)
 }
+#' Get variable genes
+#'
+#' @param mat Gene expression matrix
+#' @param nGenes Number of genes
+#'
+#' @export
+#'
 getVariableGenes <- function(mat, nGenes) {
   vi <- apply(mat, 1, var)
   names(vi) <- rownames(mat)
@@ -251,28 +268,28 @@ getVariableGenes <- function(mat, nGenes) {
 }
 
 
-##' Get clusters by community detection on approximate nearest neighbors
-##'
-##' Group cells into clusters based on graph-based community detection on approximate nearest neighbors
-##'
-##' @param mat Matrix of cells as columns. Features as rows (such as PCs).
-##' @param k K-nearest neighbor parameter.
-##' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
-##' @param verbose Verbosity (default: TRUE)
-##' @param details Whether to return just community annotation or entended details including graph and graph modularity
-##'
-##' @return Vector of community annotations
-##'
-##' @examples {
-##' data(pbmcA)
-##' mat <- cleanCounts(pbmcA)
-##' mat <- normalizeVariance(mat)
-##' pcs <- getPcs(mat)
-##' com <- getComMembership(pcs, k=30)
-##' }
-##'
-##' @export
-##'
+#' Get clusters by community detection on approximate nearest neighbors
+#'
+#' Group cells into clusters based on graph-based community detection on approximate nearest neighbors
+#'
+#' @param mat Matrix of cells as columns. Features as rows (such as PCs).
+#' @param k K-nearest neighbor parameter.
+#' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
+#' @param verbose Verbosity (default: TRUE)
+#' @param details Whether to return just community annotation or entended details including graph and graph modularity
+#'
+#' @return Vector of community annotations
+#'
+#' @examples {
+#' data(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' mat <- normalizeVariance(mat)
+#' pcs <- getPcs(mat)
+#' com <- getComMembership(pcs, k=30)
+#' }
+#'
+#' @export
+#'
 getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TRUE, details=FALSE) {
   if(verbose) {
     print("finding approximate nearest neighbors ...")
@@ -317,31 +334,31 @@ getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 }
 
 
-##' Get clusters by community detection on approximate nearest neighbors with subsampling
-##'
-##' Group cells into clusters based on graph-based community detection on approximate nearest neighbors for random subset of cells
-##' For when getComMembership takes too long due to there being too many cells
-##'
-##' @param mat Matrix of cells as columns. Features as rows (such as PCs).
-##' @param k K-nearest neighbor parameter.
-##' @param nsubsample Number of cells in subset (default: ncol(mat)*0.5)
-##' @param seed Random seed for reproducibility
-##' @param vote Use neighbor voting system to annotate rest of cells not in subset. If false, will use machine-learning model. (default: FALSE)
-##' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
-##' @param verbose Verbosity (default: TRUE)
-##'
-##' @return Vector of community annotations
-##'
-##' @examples {
-##' data(pbmcA)
-##' mat <- cleanCounts(pbmcA)
-##' mat <- normalizeVariance(mat)
-##' pcs <- getPcs(mat)
-##' com <- getApproxComMembership(pcs, k=30)
-##' }
-##'
-##' @export
-##'
+#' Get clusters by community detection on approximate nearest neighbors with subsampling
+#'
+#' Group cells into clusters based on graph-based community detection on approximate nearest neighbors for random subset of cells
+#' For when getComMembership takes too long due to there being too many cells
+#'
+#' @param mat Matrix of cells as columns. Features as rows (such as PCs).
+#' @param k K-nearest neighbor parameter.
+#' @param nsubsample Number of cells in subset (default: ncol(mat)*0.5)
+#' @param seed Random seed for reproducibility
+#' @param vote Use neighbor voting system to annotate rest of cells not in subset. If false, will use machine-learning model. (default: FALSE)
+#' @param method Community detection method from igraph. (default: igraph::cluster_walktrap)
+#' @param verbose Verbosity (default: TRUE)
+#'
+#' @return Vector of community annotations
+#'
+#' @examples {
+#' data(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' mat <- normalizeVariance(mat)
+#' pcs <- getPcs(mat)
+#' com <- getApproxComMembership(pcs, k=30)
+#' }
+#'
+#' @export
+#'
 getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igraph::cluster_walktrap, seed=0, vote=FALSE, verbose=TRUE) {
 
   if(verbose) {
@@ -350,12 +367,12 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
   ## random subsampling
   ## TODO: density based downsampling
   set.seed(seed)
-  subsample <- sample(colnames(mat), nsubsample)
+  subsample <- sample(rownames(mat), nsubsample)
 
   if(verbose) {
     print('Identifying cluster membership for subsample ... ')
   }
-  pcs.sub <- mat[, subsample]
+  pcs.sub <- mat[subsample, ]
   com.sub <- getComMembership(pcs.sub, k=k, method=method)
 
   if(verbose) {
@@ -364,26 +381,26 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 
   ## Use neighbor voting
   if(vote) {
-    data <- mat[, subsample]
-    query <- mat[, setdiff(colnames(mat), subsample)]
-    knn <- RANN::nn2(t(data), t(query), k=k)[[1]]
-    rownames(knn) <- colnames(query)
+    data <- mat[subsample, ]
+    query <- mat[setdiff(rownames(mat), subsample), ]
+    knn <- RANN::nn2(data, query, k=k)[[1]]
+    rownames(knn) <- rownames(query)
     com.nonsub <- unlist(apply(knn, 1, function(x) {
       ## nearest neighbors in data
-      nn <- colnames(data)[x]
+      nn <- rownames(data)[x]
       ## look at their cell type annotations
       nn.com <- com.sub[nn]
       ## get most frequent annotation
       return(names(sort(table(nn.com), decreasing=TRUE)[1]))
     }))
-    com.all <- factor(c(com.sub, com.nonsub)[colnames(mat)])
+    com.all <- factor(c(com.sub, com.nonsub)[rownames(mat)])
   }
   else {
     ## Use model instead
     ## Inspired by DenSVM
-    df.sub <- data.frame(celltype=com.sub, t(pcs.sub))
+    df.sub <- data.frame(celltype=com.sub, pcs.sub)
     model <- MASS::lda(celltype ~ ., data=df.sub)
-    df.all <- data.frame(t(mat))
+    df.all <- data.frame(mat)
     model.output <- predict(model, df.all)
     com.all <- model.output$class
     names(com.all) <- rownames(df.all)
@@ -397,30 +414,30 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 }
 
 
-##' Linear discriminant analysis model
-##'
-##' Identifies components that maximally discriminate among groups using a linear discriminant analysis model
-##'
-##' @param mat Expression matrix with cells as columns, transferable features such as genes as rows.
-##' @param com Community annotations
-##' @param verbose Verbosity (default: TRUE)
-##' @param nfeatures Number of features (genes) in LDA model (default: all)
-##' @param random Wehther those features are random of chosen based on variance (most variable will be chosen by default)
-##' @param retest Whether to retest model for accuracy
-##'
-##' @return LDA model
-##'
-##' @examples {
-##' data(pbmcA)
-##' mat <- cleanCounts(pbmcA)
-##' mat <- normalizeVariance(mat)
-##' pcs <- getPcs(mat)
-##' com <- getKnnMembership(pcs, k=30)
-##' model <- modelLda(mat, com)
-##' }
-##'
-##' @export
-##'
+#' Linear discriminant analysis model
+#'
+#' Identifies components that maximally discriminate among groups using a linear discriminant analysis model
+#'
+#' @param mat Expression matrix with cells as columns, transferable features such as genes as rows.
+#' @param com Community annotations
+#' @param verbose Verbosity (default: TRUE)
+#' @param nfeatures Number of features (genes) in LDA model (default: all)
+#' @param random Wehther those features are random of chosen based on variance (most variable will be chosen by default)
+#' @param retest Whether to retest model for accuracy
+#'
+#' @return LDA model
+#'
+#' @examples {
+#' data(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' mat <- normalizeVariance(mat)
+#' pcs <- getPcs(mat)
+#' com <- getKnnMembership(pcs, k=30)
+#' model <- modelLda(mat, com)
+#' }
+#'
+#' @export
+#'
 modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, retest=TRUE) {
   ## filter to reduce feature modeling space
   if(nfeatures < nrow(mat)) {
@@ -456,14 +473,14 @@ modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, 
 }
 
 
-##' Differential expression analysis (adapted from PAGODA2)
-##'
-##' @param cd A read count matrix. The rows correspond to genes, columns correspond to individual cells
-##' @param cols Column/cell group annotations. Will perform one vs. all differential expression analysis.
-##' @param verbose Verbosity
-##'
-##' @export
-##'
+#' Differential expression analysis (adapted from PAGODA2)
+#'
+#' @param cd A read count matrix. The rows correspond to genes, columns correspond to individual cells
+#' @param cols Column/cell group annotations. Will perform one vs. all differential expression analysis.
+#' @param verbose Verbosity
+#'
+#' @export
+#'
 getDifferentialGenes <- function(cd, cols, verbose=TRUE) {
   cm <- t(cd)
 
@@ -668,21 +685,21 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
 }
 
 
-##' Iterative merging of clusters along tree until stable
-##'
-##' @param cd Counts matrix for differential expression analysis. Rows are genes. Columns are cells.
-##' @param com Community/group annotations for cells
-##' @param matnorm Normalized gene expression matrix for building group relationship tree. Rows are genes. Columns are cells.
-##' @param z.threshold Z-score threshold for identifying significantly differentially expressed genes
-##' @param hclust.method Hierarchical clustering method used to construct relationship tree
-##' @param min.group.size Minimum group size for stable cluster
-##' @param min.diff.genes Minimum number of significantly differentially expressed genes that must be identified or else groups will be merged
-##' @param max.iter Maximum number of iterations. Will end earlier if convergence reached.
-##' @param plot Whether to plot intermediate plots (hierarchical clustering dendrograms)
-##' @param verbose Verbosity
-##'
-##' @export
-##'
+#' Iterative merging of clusters along tree until stable
+#'
+#' @param cd Counts matrix for differential expression analysis. Rows are genes. Columns are cells.
+#' @param com Community/group annotations for cells
+#' @param matnorm Normalized gene expression matrix for building group relationship tree. Rows are genes. Columns are cells.
+#' @param z.threshold Z-score threshold for identifying significantly differentially expressed genes
+#' @param hclust.method Hierarchical clustering method used to construct relationship tree
+#' @param min.group.size Minimum group size for stable cluster
+#' @param min.diff.genes Minimum number of significantly differentially expressed genes that must be identified or else groups will be merged
+#' @param max.iter Maximum number of iterations. Will end earlier if convergence reached.
+#' @param plot Whether to plot intermediate plots (hierarchical clustering dendrograms)
+#' @param verbose Verbosity
+#'
+#' @export
+#'
 getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.group.size=10, min.diff.genes=nrow(cd)*0.005, max.iter=10, verbose=TRUE, plot=FALSE) {
 
   if(min.group.size>1) { com[com %in% levels(com)[unlist(tapply(com,com,length))<min.group.size]] <- NA; com <- droplevels(com); }
@@ -814,15 +831,15 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
 }
 
 
-##' Predict LD embedding for new dataset given old model and gene scale factor
-##'
-##' @param mat Library-size normalized gene expression matrix
-##' @param model LDA model
-##' @param gsf Gene scale factor to be applied to mat (so mat must not be variance normalized)
-##' @param verbose Verbosity
-##'
-##' @export
-##'
+#' Predict LD embedding for new dataset given old model and gene scale factor
+#'
+#' @param mat Library-size normalized gene expression matrix
+#' @param model LDA model
+#' @param gsf Gene scale factor to be applied to mat (so mat must not be variance normalized)
+#' @param verbose Verbosity
+#'
+#' @export
+#'
 predictLds <- function(mat, model, gsf, verbose=TRUE) {
   gsf.have <- intersect(names(gsf), rownames(mat))
   if(verbose) {
@@ -839,13 +856,13 @@ predictLds <- function(mat, model, gsf, verbose=TRUE) {
 }
 
 
-##' Use LDA model posteriors to retain only confident predictions
-##'
-##' @param posterior Posterior probabilities from LDA
-##' @param t Posteriors below this threshold are set to NA
-##'
-##' @export
-##'
+#' Use LDA model posteriors to retain only confident predictions
+#'
+#' @param posterior Posterior probabilities from LDA
+#' @param t Posteriors below this threshold are set to NA
+#'
+#' @export
+#'
 getConfidentPreds <- function(posterior, t=0.95) {
   class <- apply(posterior, 1, function(x) {
     x <- sort(x, decreasing=TRUE)
@@ -860,14 +877,14 @@ getConfidentPreds <- function(posterior, t=0.95) {
 }
 
 
-##' Batch correct within identified groups using ComBat
-##'
-##' @param lds.all Matrix to be batch corrected
-##' @param batch Batch factor annotations
-##' @param com.final Group annotations
-##' @param min.group.size Minimum number of cells in a group in order to batch correct
-##' @export
-##'
+#' Batch correct within identified groups using ComBat
+#'
+#' @param lds.all Matrix to be batch corrected
+#' @param batch Batch factor annotations
+#' @param com.final Group annotations
+#' @param min.group.size Minimum number of cells in a group in order to batch correct
+#' @export
+#'
 clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=10) {
   com.final <- factor(com.final)
   lds.bc <- do.call(rbind, lapply(levels(com.final), function(ct){
@@ -884,20 +901,20 @@ clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=1
 }
 
 
-##' Run tSNE on LDs from model
-##'
-##' @param mat Normalized matrix
-##' @param model LDA model
-##' @param perplexity Perplexity parameter for tSNE
-##' @param verbose Verbosity
-##' @param plot Whether to plot
-##' @param do.par Whether to set plot margins
-##' @param ncores Number of cores for paralele tSNE
-##' @param details Whether to return details
-##' @param ... Additional parameters to pass to plot
-##'
-##' @export
-##'
+#' Run tSNE on LDs from model
+#'
+#' @param mat Normalized matrix
+#' @param model LDA model
+#' @param perplexity Perplexity parameter for tSNE
+#' @param verbose Verbosity
+#' @param plot Whether to plot
+#' @param do.par Whether to set plot margins
+#' @param ncores Number of cores for paralele tSNE
+#' @param details Whether to return details
+#' @param ... Additional parameters to pass to plot
+#'
+#' @export
+#'
 tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=TRUE, ncores=10, details=FALSE, ...) {
   if(verbose) {
     print('Running LDA models ...')
@@ -952,31 +969,31 @@ tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=T
 }
 
 
-##' Plot 2D embedding
-##'
-##' @param emb dataframe with x and y coordinates
-##' @param groups factor annotations for rows on emb for visualizing cluster annotations
-##' @param colors color or numeric values for rows on emb for visualizing gene expression
-##' @param cex point size
-##' @param alpha point opacity
-##' @param gradientPalette palette for colors if numeric values provided
-##' @param zlim range for colors
-##' @param s saturation of rainbow for group colors
-##' @param v value of rainbow for group colors
-##' @param min.group.size minimum size of group in order for group to be colored
-##' @param show.legend whether to show legend
-##' @param mark.clusters whether to mark clusters with name of cluster
-##' @param mark.cluster.cex cluster marker point size
-##' @param shuffle.colors whether to shuffle group colors
-##' @param legend.x legend position ie. 'topright', 'topleft', 'bottomleft', 'bottomright'
-##' @param gradient.range.quantile quantile for mapping colors to gradient palette
-##' @param verbose verbosity
-##' @param unclassified.cell.color cells not included in groups will be labeled in this color
-##' @param group.level.colors set group level colors. Default uses rainbow.
-##' @param ... Additional parameters to pass to BASE::plot
-##'
-##' @export
-##'
+#' Plot 2D embedding
+#'
+#' @param emb dataframe with x and y coordinates
+#' @param groups factor annotations for rows on emb for visualizing cluster annotations
+#' @param colors color or numeric values for rows on emb for visualizing gene expression
+#' @param cex point size
+#' @param alpha point opacity
+#' @param gradientPalette palette for colors if numeric values provided
+#' @param zlim range for colors
+#' @param s saturation of rainbow for group colors
+#' @param v value of rainbow for group colors
+#' @param min.group.size minimum size of group in order for group to be colored
+#' @param show.legend whether to show legend
+#' @param mark.clusters whether to mark clusters with name of cluster
+#' @param mark.cluster.cex cluster marker point size
+#' @param shuffle.colors whether to shuffle group colors
+#' @param legend.x legend position ie. 'topright', 'topleft', 'bottomleft', 'bottomright'
+#' @param gradient.range.quantile quantile for mapping colors to gradient palette
+#' @param verbose verbosity
+#' @param unclassified.cell.color cells not included in groups will be labeled in this color
+#' @param group.level.colors set group level colors. Default uses rainbow.
+#' @param ... Additional parameters to pass to BASE::plot
+#'
+#' @export
+#'
 plotEmbedding <- function(emb, groups=NULL, colors=NULL, cex=0.6, alpha=0.4, gradientPalette=NULL, zlim=NULL, s=1, v=0.8, min.group.size=1, show.legend=FALSE, mark.clusters=FALSE, mark.cluster.cex=2, shuffle.colors=F, legend.x='topright', gradient.range.quantile=0.95, verbose=TRUE, unclassified.cell.color='gray70', group.level.colors=NULL, ...) {
 
   if(!is.null(colors)) {

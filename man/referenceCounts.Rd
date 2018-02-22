@@ -4,7 +4,7 @@
 \name{referenceCounts}
 \alias{referenceCounts}
 \title{Sorted CD14+ Monocytes CD19+ B Cells, CD34+ Cells, CD4+ Helper T Cells, CD4+/CD25+ Regulatory T Cells, CD4+/CD45RA+/CD25- Naive T cells, CD4+/CD45RO+ Memory T Cells, CD56+ Natural Killer Cells, CD8+ Cytotoxic T cells, CD8+/CD45RA+ Naive Cytotoxic T Cells}
-\format{An object of class \code{dgCMatrix} with 8863 rows and 2140 columns.}
+\format{An object of class \code{matrix} with 8863 rows and 2140 columns.}
 \source{
 \url{https://support.10xgenomics.com/single-cell-gene-expression/datasets}
 }
