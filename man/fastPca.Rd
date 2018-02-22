@@ -16,6 +16,8 @@ fastPca(m, nPcs = 2, tol = 1e-10, scale = FALSE, center = TRUE, ...)
 \item{scale}{Scale input}
 
 \item{center}{Center input}
+
+\item{...}{Additional parameters to pass to irlba}
 }
 \description{
 Derive principal components by SVD

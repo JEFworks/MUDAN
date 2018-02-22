@@ -241,6 +241,7 @@ getPcs <- function(mat, nGenes = min(nrow(mat), 1000), nPcs = 100, verbose=TRUE,
 #' @param tol irlba tol
 #' @param scale Scale input
 #' @param center Center input
+#' @param ... Additional parameters to pass to irlba
 #'
 #' @export
 #'
@@ -432,7 +433,7 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
 #' mat <- cleanCounts(pbmcA)
 #' mat <- normalizeVariance(mat)
 #' pcs <- getPcs(mat)
-#' com <- getKnnMembership(pcs, k=30)
+#' com <- getComMembership(pcs, k=30)
 #' model <- modelLda(mat, com)
 #' }
 #'

@@ -32,7 +32,7 @@ data(pbmcA)
 mat <- cleanCounts(pbmcA)
 mat <- normalizeVariance(mat)
 pcs <- getPcs(mat)
-com <- getKnnMembership(pcs, k=30)
+com <- getComMembership(pcs, k=30)
 model <- modelLda(mat, com)
 }
 

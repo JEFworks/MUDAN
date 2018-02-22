@@ -19,8 +19,10 @@ myMudanObject <- Mudan$new("PBMC", pbmcA)
 myMudanObject$libSizeNormalize()
 myMudanObject$varianceNormalize(plot=TRUE)
 myMudanObject$dimensionalityReduction(maxit=1000)
-myMudanObject$communityDetection(communityName='Infomap', communityMethod=igraph::cluster_infomap, k=10, minSize=10)
-myMudanObject$communityDetection(communityName='Walktrap', communityMethod=igraph::cluster_walktrap, k=10, minSize=10)
+myMudanObject$communityDetection(communityName='Infomap',
+     communityMethod=igraph::cluster_infomap, k=10, minSize=10)
+myMudanObject$communityDetection(communityName='Walktrap',
+     communityMethod=igraph::cluster_walktrap, k=10, minSize=10)
 myMudanObject$modelCommunity()
 myMudanObject$getMudanEmbedding(plot=FALSE)
 myMudanObject$getStandardEmbedding(plot=FALSE)
