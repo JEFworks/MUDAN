@@ -61,6 +61,7 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 ##' @export
 ##'
 normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
+
   if(verbose) {
     print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
   }
@@ -495,12 +496,12 @@ getDifferentialGenes <- function(cd, cols, verbose=TRUE) {
   ##xr <- sparse_matrix_column_ranks(cm);
 
   # calculate rank sums per group
-  grs <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(xr[cols==g,])))
+  grs <- do.call(rbind, lapply(levels(cols), function(g) colSums(xr[cols==g,])))
   rownames(grs) <- levels(cols); colnames(grs) <- colnames(xr)
   ##grs <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
 
   # calculate number of non-zero entries per group
-  gnzz <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(xr[cols==g,]>0)))
+  gnzz <- do.call(rbind, lapply(levels(cols), function(g) colSums(xr[cols==g,]>0)))
   rownames(gnzz) <- levels(cols); colnames(gnzz) <- colnames(xr)
   #xr@x <- numeric(length(xr@x))+1
   #gnzz <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
@@ -537,8 +538,8 @@ getDifferentialGenes <- function(cd, cols, verbose=TRUE) {
   colnames(x) <- levels(cols)[1:ncol(x)]
 
   # add fold change information
-  log.gene.av <- log2(Matrix::colMeans(cm));
-  group.gene.av <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(cm[cols==g,]>0))) / (group.size+1);
+  log.gene.av <- log2(colMeans(cm));
+  group.gene.av <- do.call(rbind, lapply(levels(cols), function(g) colSums(cm[cols==g,]>0))) / (group.size+1);
   log2.fold.change <- log2(t(group.gene.av)) - log.gene.av;
   # fraction of cells expressing
   f.expressing <- t(gnzz / group.size);
@@ -561,9 +562,6 @@ getDifferentialGenes <- function(cd, cols, verbose=TRUE) {
 ## annotate clusters; old; needs major speed improvement
 getClusterGeneInfo <- function(mat, com, verbose=FALSE, ncores=10) {
 
-  if(class(mat)!='matrix') {
-    mat <- as.matrix(mat)
-  }
   if(class(com)!='factor') {
     com <- factor(com)
   }
@@ -598,11 +596,11 @@ getClusterGeneInfo <- function(mat, com, verbose=FALSE, ncores=10) {
     pvs <- sapply(aucs.pvs, function(x) x[[2]])
 
     ## assess average fold change
-    xm <- Rfast::rowmeans(x)
-    ym <- Rfast::rowmeans(y)
+    xm <- rowMeans(x)
+    ym <- rowMeans(y)
     fc <- log2(xm/ym)
     ## percent expressing
-    pe <- Rfast::rowsums(x>0)/ncol(x)
+    pe <- rowSums(x>0)/ncol(x)
     ## z-score
     zs <- abs(qnorm(1 - (pvs/2), lower.tail=FALSE))*sign(fc)
 
