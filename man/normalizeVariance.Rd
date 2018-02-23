@@ -3,14 +3,16 @@
 \name{normalizeVariance}
 \alias{normalizeVariance}
 \title{Normalize gene expression variance relative to transcriptome-wide expectations
-(Modified from SCDE/PAGODA2 code; now uses Rfast)}
+(Modified from SCDE/PAGODA2 code)}
 \usage{
-normalizeVariance(mat, gam.k = 5, alpha = 0.05, plot = FALSE,
+normalizeVariance(counts, gam.k = 5, alpha = 0.05, plot = FALSE,
   use.unadjusted.pvals = FALSE, do.par = TRUE,
   max.adjusted.variance = 1000, min.adjusted.variance = 0.001,
   verbose = TRUE, details = FALSE)
 }
 \arguments{
+\item{counts}{Read count matrix. The rows correspond to genes, columns correspond to individual cells}
+
 \item{gam.k}{Generalized additive model parameter; the dimension of the basis used to represent the smooth term (default: 5)}
 
 \item{alpha}{Significance threshold (default: 0.05)}
@@ -28,8 +30,6 @@ normalizeVariance(mat, gam.k = 5, alpha = 0.05, plot = FALSE,
 \item{verbose}{Verbosity (default: TRUE)}
 
 \item{details}{If true, will return data frame of normalization parameters. Else will return normalized matrix.(default: FALSE)}
-
-\item{counts}{Read count matrix. The rows correspond to genes, columns correspond to individual cells}
 }
 \value{
 If details is true, will return data frame of normalization parameters. Else will return normalized matrix.
@@ -41,7 +41,8 @@ transcriptome-wide expectation as determined by local regression on expression m
 \examples{
 {
 data(pbmcA)
-mat <- cleanCounts(pbmcA)
+cd <- pbmcA[, 1:500]
+mat <- cleanCounts(cd)
 mat <- normalizeVariance(mat)
 }
 

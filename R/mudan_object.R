@@ -1,24 +1,29 @@
-##' Mudan object
-##'
-##' @example
-##' library(MUDAN)
-##' source('../R/mudan.R')
-##' data(pbmcA)
-##' myMudanObject <- Mudan$new("PBMC", pbmcA)
-##' myMudanObject$libSizeNormalize()
-##' myMudanObject$varianceNormalize(plot=TRUE)
-##' myMudanObject$dimensionalityReduction(maxit=1000)
-##' myMudanObject$communityDetection(communityName='Infomap', communityMethod=igraph::cluster_infomap, k=10, minSize=10)
-##' myMudanObject$communityDetection(communityName='Walktrap', communityMethod=igraph::cluster_walktrap, k=10, minSize=10)
-##' myMudanObject$modelCommunity()
-##' myMudanObject$getMudanEmbedding(plot=FALSE)
-##' myMudanObject$getStandardEmbedding(plot=FALSE)
-##' par(mfrow=c(2,2))
-##' myMudanObject$plot(communityName='Infomap', embeddingType='MUDAN')
-##' myMudanObject$plot(communityName='Walktrap', embeddingType='MUDAN')
-##' myMudanObject$plot(communityName='Infomap', embeddingType='PCA')
-##' myMudanObject$plot(communityName='Walktrap', embeddingType='PCA')
-##'
+#' R6 object for storing all relevant output from MUDAN analysis in single entity
+#'
+#' @examples {
+#' library(MUDAN)
+#' data(pbmcA)
+#' cd <- pbmcA[, 1:500]
+#' myMudanObject <- Mudan$new("PBMCA", cd)
+#' myMudanObject$libSizeNormalize()
+#' myMudanObject$varianceNormalize(plot=TRUE)
+#' myMudanObject$dimensionalityReduction(maxit=1000)
+#' myMudanObject$communityDetection(communityName='Infomap',
+#'      communityMethod=igraph::cluster_infomap, k=10, minSize=10)
+#' myMudanObject$communityDetection(communityName='Walktrap',
+#'      communityMethod=igraph::cluster_walktrap, k=10, minSize=10)
+#' myMudanObject$modelCommunity()
+#' myMudanObject$getMudanEmbedding(plot=FALSE)
+#' myMudanObject$getStandardEmbedding(plot=FALSE)
+#' par(mfrow=c(2,2))
+#' myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='MUDAN')
+#' myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='MUDAN')
+#' myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='PCA')
+#' myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='PCA')
+#' }
+#'
+#' @export
+#'
 Mudan <- R6::R6Class(
     "Mudan",
     public = list(
@@ -108,8 +113,8 @@ Mudan <- R6::R6Class(
         getStandardEmbedding =
             function(plot=TRUE, do.par=TRUE, ...)
             {
-                pcs.emb <- Rtsne::Rtsne(t(self$pcs), is_distance=FALSE, num_threads=self$ncores)$Y
-                rownames(pcs.emb) <- colnames(self$pcs)
+                pcs.emb <- Rtsne::Rtsne(self$pcs, is_distance=FALSE, num_threads=self$ncores)$Y
+                rownames(pcs.emb) <- rownames(self$pcs)
                 self$emb[['PCA']] <- pcs.emb
                 if(plot) {
                     if(do.par) {

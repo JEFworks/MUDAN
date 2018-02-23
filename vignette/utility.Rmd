@@ -56,7 +56,12 @@ myMudanObject$libSizeNormalize()
 myMudanObject$varianceNormalize(plot=FALSE)
 myMudanObject$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
 myMudanObject$getStandardEmbedding(plot=FALSE)
+
+myMudanObject$communityDetection(reductionType='pcs', communityName="Infomap", communityMethod=igraph::cluster_infomap, k=70)
+
+par(mfrow=c(1,2), mar=c(5,5,15,5))
 plotEmbedding(myMudanObject$emb[['PCA']], groups=group, main="comb PCA", show.legend=TRUE)
+myMudanObject$plot(reductionType='pcs', communityName="Infomap", embeddingType="PCA", main='detected community', show.legend=TRUE)
 ```
 
 Indeed, we see prominent batch/patient differences. Traditionally, we would normalize out batch specific differences with batch correction using as using `combat`. 
@@ -71,7 +76,13 @@ cdbc <- sva::ComBat(dat=as.matrix(myMudanObjectbc$matnorm), batch=group[colnames
 myMudanObjectbc$matnorm <- cdbc
 myMudanObjectbc$dimensionalityReduction(nGenes = 1000, nPcs = 30, maxit=1000)
 myMudanObjectbc$getStandardEmbedding(plot=FALSE)
+
+myMudanObjectbc$communityDetection(reductionType='pcs', communityName="Infomap", communityMethod=igraph::cluster_infomap, k=60)
+
+par(mfrow=c(1,2))
 plotEmbedding(myMudanObjectbc$emb[['PCA']], groups=group, main="comb batch normalized PCA", show.legend=TRUE)
+myMudanObjectbc$plot(reductionType='pcs', communityName="Infomap", embeddingType="PCA", main='detected community', show.legend=TRUE)
+
 ```
 
 However, we will show later that this batch correction "over-corrects", removing true biological signal and obscures our ability to identify the appropriate cell subtypes. 
@@ -145,7 +156,7 @@ We can get new annotations from the projection and compare with our previous res
 
 ```{r}
 ## get new annotation
-com <- getComMembership(t(reduction), k=100, method=igraph::cluster_infomap)
+com <- getComMembership(t(reduction), k=70, method=igraph::cluster_infomap)
 par(mfrow=c(1,3))
 plotEmbedding(emb, groups=com)
 plotEmbedding(myMudanObject1$emb[['PCA']], groups=com[rownames(myMudanObject1$emb[['PCA']])])

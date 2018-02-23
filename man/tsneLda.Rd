@@ -4,8 +4,27 @@
 \alias{tsneLda}
 \title{Run tSNE on LDs from model}
 \usage{
-tsneLda(mat, model, com, perplexity = 30, verbose = TRUE, plot = TRUE,
-  do.par = TRUE, ncores = 10, ...)
+tsneLda(mat, model, perplexity = 30, verbose = TRUE, plot = TRUE,
+  do.par = TRUE, ncores = 10, details = FALSE, ...)
+}
+\arguments{
+\item{mat}{Normalized matrix}
+
+\item{model}{LDA model}
+
+\item{perplexity}{Perplexity parameter for tSNE}
+
+\item{verbose}{Verbosity}
+
+\item{plot}{Whether to plot}
+
+\item{do.par}{Whether to set plot margins}
+
+\item{ncores}{Number of cores for paralele tSNE}
+
+\item{details}{Whether to return details}
+
+\item{...}{Additional parameters to pass to plot}
 }
 \description{
 Run tSNE on LDs from model
