@@ -1,42 +1,59 @@
-#' Filter counts matrix
-#'
-#' Filter counts matrix based on gene and cell requirements
-#'
-#' @param counts A read count matrix. The rows correspond to genes, columns correspond to individual cells
-#' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)
-#' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
-#' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
-#' @param min.detected Minimum number of cells a gene must be seen in. Genes not seen in a sufficient number of cells will be removed (default: 5)
-#' @param verbose Verbosity (default: TRUE)
-#'
-#' @return a filtered read count matrix
-#'
-#' @examples {
-#' data(pbmcA)
-#' cd <- pbmcA[, 1:500]
-#' mat <- cleanCounts(cd)
-#' dim(mat)
-#' }
-#'
-#' @export
-#'
-cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 10, min.detected = 5, verbose=TRUE) {
+#' @import stats grDevices graphics
+NULL
 
-  if(verbose) {
-    print(paste0('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...'))
+#' @title Filter a counts matrix
+#' @description Filter a counts matrix based on gene (row) and cell (column)
+#'      requirements.
+#' @param counts A sparse read count matrix. The rows correspond to genes,
+#'      columns correspond to individual cells
+#' @param min.lib.size Minimum number of genes detected in a cell. Cells with
+#'      fewer genes will be removed (default: 300)
+#' @param max.lib.size Maximum number of genes detected in a cell. Cells with
+#'      more genes will be removed (default: 8000)
+#' @param min.reads Minimum number of reads per gene. Genes with fewer reads
+#'      will be removed (default: 1)
+#' @param min.detected Minimum number of cells a gene must be seen in. Genes
+#'      not seen in a sufficient number of cells will be removed (default: 1)
+#' @param verbose Verbosity (default: TRUE)
+#' @return a filtered read count matrix
+#' @examples
+#' data(pbmcA)
+#' dim(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' dim(mat)
+#' @export
+#' @importFrom Matrix Matrix colSums rowSums
+cleanCounts <- function(
+  counts,
+  min.lib.size = 300,
+  max.lib.size = 8000,
+  min.reads    = 1,
+  min.detected = 1,
+  verbose      = TRUE
+) {
+
+  if (!class(counts) %in% c("dgCMatrix", "dgTMatrix")) {
+    message('Converting to sparse matrix ...')
+    counts <- Matrix::Matrix(counts, sparse = TRUE)
   }
 
-  ## filter out low-gene cells
-  counts <- counts[, colSums(counts)>min.lib.size]
-  ## filter out potential doublets
-  counts <- counts[, colSums(counts)<max.lib.size]
-  ## remove genes that don't have many reads
-  counts <- counts[rowSums(counts)>min.reads, ]
-  ## remove genes that are not seen in a sufficient number of cells
-  counts <- counts[rowSums(counts>0)>min.detected, ]
+  if (verbose) {
+    message('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...')
+  }
 
-  if(verbose) {
-    print(paste0('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
+  ## filter out low-gene cells or potential doublets
+  ix_col <- Matrix::colSums(counts)
+  ix_col <- ix_col > min.lib.size & ix_col < max.lib.size
+  counts <- counts[, ix_col]
+
+  ## remove genes that don't have many reads
+  counts <- counts[Matrix::rowSums(counts) > min.reads, ]
+
+  ## remove genes that are not seen in a sufficient number of cells
+  counts <- counts[Matrix::rowSums(counts > 0) > min.detected, ]
+
+  if (verbose) {
+    message('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes')
   }
 
   return(counts)
@@ -47,8 +64,9 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 #'
 #' Normalizes raw counts to log10 counts per million with pseudocount
 #'
-#' @param counts Read count matrix. The rows correspond to genes, columns correspond to individual cells
-#' @param depthScale Depth scaling. Using a million for CPM (default: e61)
+#' @param counts Read count matrix. The rows correspond to genes, columns
+#'      correspond to individual cells
+#' @param depthScale Depth scaling. Using a million for CPM (default: 1e6)
 #' @param verbose Verbosity (default: TRUE)
 #'
 #' @return a normalized matrix
@@ -60,15 +78,20 @@ cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.rea
 #' }
 #'
 #' @export
-#'
+#' @importFrom Matrix Matrix colSums t
 normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 
-  if(verbose) {
-    print(paste0('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
+  if (verbose) {
+    message('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes')
   }
 
-  counts <- t(t(counts)/colSums(counts))
-  counts <- counts*depthScale
+  if (class(counts) %in% c("dgCMatrix", "dgTMatrix")) {
+    counts <- Matrix::t(Matrix::t(counts) / Matrix::colSums(counts))
+    counts <- counts * depthScale
+  } else {
+    counts <- t(t(counts) / colSums(counts))
+    counts <- counts * depthScale
+  }
 
   return(counts)
 }
@@ -110,7 +133,7 @@ normalizeVariance <- function(counts, gam.k=5, alpha=0.05, plot=FALSE, use.unadj
   if(verbose) {
     print("Calculating variance fit ...")
   }
-  dfm <- log(colMeans(mat))
+  dfm <- log(Matrix::colMeans(mat))
   dfv <- log(apply(mat, 2, var))
   names(dfm) <- names(dfv) <- colnames(mat)
   df <- data.frame(m=dfm, v=dfv)
@@ -364,7 +387,6 @@ getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 #' }
 #'
 #' @export
-#'
 getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igraph::cluster_walktrap, seed=0, vote=FALSE, verbose=TRUE) {
 
   if(verbose) {
@@ -897,7 +919,7 @@ getConfidentPreds <- function(posterior, t=0.95) {
 #' @param com.final Group annotations
 #' @param min.group.size Minimum number of cells in a group in order to batch correct
 #' @export
-#'
+#' @importFrom sva ComBat
 clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=10) {
   com.final <- factor(com.final)
   lds.bc <- do.call(rbind, lapply(levels(com.final), function(ct){
@@ -1006,7 +1028,6 @@ tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=T
 #' @param ... Additional parameters to pass to BASE::plot
 #'
 #' @export
-#'
 plotEmbedding <- function(emb, groups=NULL, colors=NULL, cex=0.6, alpha=0.4, gradientPalette=NULL, zlim=NULL, s=1, v=0.8, min.group.size=1, show.legend=FALSE, mark.clusters=FALSE, mark.cluster.cex=2, shuffle.colors=F, legend.x='topright', gradient.range.quantile=0.95, verbose=TRUE, unclassified.cell.color='gray70', group.level.colors=NULL, ...) {
 
   if(!is.null(colors)) {
@@ -1066,7 +1087,7 @@ plotEmbedding <- function(emb, groups=NULL, colors=NULL, cex=0.6, alpha=0.4, gra
     }
   }
 
-  plot(emb,col=adjustcolor(cols,alpha=alpha),cex=cex,pch=19,axes=F, ...); box();
+  plot(emb,col=adjustcolor(cols,alpha.f=alpha),cex=cex,pch=19,axes=F, ...); box();
   if(mark.clusters) {
     if(!is.null(groups)) {
       cent.pos <- do.call(rbind,tapply(1:nrow(emb),groups,function(ii) apply(emb[ii,,drop=F],2,median)))
@@ -1080,6 +1101,7 @@ plotEmbedding <- function(emb, groups=NULL, colors=NULL, cex=0.6, alpha=0.4, gra
     }
   }
 }
+
 ## a utility function to translate factor into colors
 fac2col <- function(x,s=1,v=1,shuffle=FALSE,min.group.size=1,return.details=F,unclassified.cell.color='gray50',level.colors=NULL) {
   x <- as.factor(x);
@@ -1104,15 +1126,13 @@ fac2col <- function(x,s=1,v=1,shuffle=FALSE,min.group.size=1,return.details=F,un
     return(y);
   }
 }
+
 ## quick utility to check if given character vector is colors
 ## thanks, Josh O'Brien: http://stackoverflow.com/questions/13289009/check-if-character-string-is-a-valid-color-representation
 areColors <- function(x) {
-  is.character(x) & sapply(x, function(X) {tryCatch(is.matrix(col2rgb(X)), error = function(e) FALSE)})
+  is.character(x) &
+  sapply(x, function(X) {
+    tryCatch(is.matrix(col2rgb(X)), error = function(e) FALSE)
+  })
 }
-
-
-
-
-
-
 
