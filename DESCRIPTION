@@ -4,12 +4,17 @@ Title: Multi-sample Unified Discriminant ANalysis
 Version: 0.1.0
 Author: Jean Fan [aut]
 Maintainer: Jean Fan <jeanfan@fas.harvard.edu>
-Description: Multi-sample Unified Discriminant ANalysis
+Description: Multi-sample Unified Discriminant ANalysis.
 License: GPL-3 + file LICENSE
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.0.1
-Imports: mgcv,
+Depends:
+    R (>= 2.10),
+    Matrix
+Imports:
+    sva,
+    mgcv,
     irlba,
     RANN,
     igraph,

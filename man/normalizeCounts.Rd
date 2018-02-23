@@ -7,9 +7,10 @@
 normalizeCounts(counts, depthScale = 1e+06, verbose = TRUE)
 }
 \arguments{
-\item{counts}{Read count matrix. The rows correspond to genes, columns correspond to individual cells}
+\item{counts}{Read count matrix. The rows correspond to genes, columns
+correspond to individual cells}
 
-\item{depthScale}{Depth scaling. Using a million for CPM (default: e61)}
+\item{depthScale}{Depth scaling. Using a million for CPM (default: 1e6)}
 
 \item{verbose}{Verbosity (default: TRUE)}
 }
