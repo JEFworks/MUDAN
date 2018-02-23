@@ -1,45 +1,56 @@
-##' Filter counts matrix
-##'
-##' Filter counts matrix based on gene and cell requirements
-##'
-##' @param counts A sparse read count matrix. The rows correspond to genes, columns correspond to individual cells
-##' @param min.lib.size Minimum number of genes detected in a cell. Cells with fewer genes will be removed (default: 1000)
-##' @param max.lib.size Maximum number of genes detected in a cell. Cells with more genes will be removed (default: 8000)
-##' @param min.reads Minimum number of reads per gene. Genes with fewer reads will be removed (default: 10)
-##' @param min.detected Minimum number of cells a gene must be seen in. Genes not seen in a sufficient number of cells will be removed (default: 5)
-##' @param verbose Verbosity (default: TRUE)
-##'
-##' @return a filtered read count matrix
-##'
-##' @examples {
-##' data(pbmcA)
-##' dim(pbmcA)
-##' mat <- cleanCounts(pbmcA)
-##' dim(mat)
-##' }
-##'
-##' @export
-##'
-cleanCounts <- function(counts, min.lib.size = 300, max.lib.size = 8000, min.reads = 1, min.detected = 1, verbose=TRUE) {
-  if(class(counts)!="dgCMatrix") {
-    counts <- as.matrix(counts, sparse=TRUE)
+#' @title Filter a counts matrix
+#' @description Filter a counts matrix based on gene (row) and cell (column)
+#'      requirements.
+#' @param counts A sparse read count matrix. The rows correspond to genes,
+#'      columns correspond to individual cells
+#' @param min.lib.size Minimum number of genes detected in a cell. Cells with
+#'      fewer genes will be removed (default: 300)
+#' @param max.lib.size Maximum number of genes detected in a cell. Cells with
+#'      more genes will be removed (default: 8000)
+#' @param min.reads Minimum number of reads per gene. Genes with fewer reads
+#'      will be removed (default: 1)
+#' @param min.detected Minimum number of cells a gene must be seen in. Genes
+#'      not seen in a sufficient number of cells will be removed (default: 1)
+#' @param verbose Verbosity (default: TRUE)
+#' @return a filtered read count matrix
+#' @examples
+#' data(pbmcA)
+#' dim(pbmcA)
+#' mat <- cleanCounts(pbmcA)
+#' dim(mat)
+#' @export
+#' @importFrom Matrix Matrix colSums rowSums
+cleanCounts <- function(
+  counts,
+  min.lib.size = 300,
+  max.lib.size = 8000,
+  min.reads    = 1,
+  min.detected = 1,
+  verbose      = TRUE
+) {
+
+  if (!class(counts) %in% c("dgCMatrix", "dgTMatrix")) {
+    message('Converting to sparse matrix ...')
+    counts <- Matrix::Matrix(counts, sparse = TRUE)
   }
 
-  if(verbose) {
-    print(paste0('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...'))
+  if (verbose) {
+    message('Filtering matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes ...')
   }
 
-  ## filter out low-gene cells
-  counts <- counts[, Matrix::colSums(counts)>min.lib.size]
-  ## filter out potential doublets
-  counts <- counts[, Matrix::colSums(counts)<max.lib.size]
+  ## filter out low-gene cells or potential doublets
+  ix_col <- Matrix::colSums(counts)
+  ix_col <- ix_col > min.lib.size & ix_col < max.lib.size
+  counts <- counts[, ix_col]
+
   ## remove genes that don't have many reads
-  counts <- counts[Matrix::rowSums(counts)>min.reads, ]
-  ## remove genes that are not seen in a sufficient number of cells
-  counts <- counts[Matrix::rowSums(counts>0)>min.detected, ]
+  counts <- counts[Matrix::rowSums(counts) > min.reads, ]
 
-  if(verbose) {
-    print(paste0('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes'))
+  ## remove genes that are not seen in a sufficient number of cells
+  counts <- counts[Matrix::rowSums(counts > 0) > min.detected, ]
+
+  if (verbose) {
+    message('Resulting matrix has ', ncol(counts), ' cells and ', nrow(counts), ' genes')
   }
 
   return(counts)
