@@ -4,7 +4,7 @@
 \name{pbmcB}
 \alias{pbmcB}
 \title{Frozen PBMCs (Donor B)}
-\format{An object of class \code{matrix} with 15325 rows and 7765 columns.}
+\format{A sparse matrix with 15325 genes (rows) and 7765 cells (columns).}
 \source{
 \url{https://support.10xgenomics.com/single-cell-gene-expression/datasets}
 }
