@@ -922,6 +922,7 @@ getConfidentPreds <- function(posterior, t=0.95) {
 #' @importFrom sva ComBat
 clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=10) {
   com.final <- factor(com.final)
+  nas <- names(which(is.na(com.final)))
   lds.bc <- do.call(rbind, lapply(levels(com.final), function(ct){
     cells <- na.omit(names(com.final)[com.final==ct])
     batch.cells <- factor(batch[cells])
@@ -932,6 +933,7 @@ clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=1
       lds.all[cells,]
     }
   }))
+  lds.bc <- cbind(lds.bc, lds.all[,nas])
   return(lds.bc)
 }
 
