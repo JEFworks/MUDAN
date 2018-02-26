@@ -3,7 +3,10 @@
 \docType{data}
 \name{referenceAnnot}
 \alias{referenceAnnot}
-\title{Annotations for sorted CD14+ Monocytes CD19+ B Cells, CD34+ Cells, CD4+ Helper T Cells, CD4+/CD25+ Regulatory T Cells, CD4+/CD45RA+/CD25- Naive T cells, CD4+/CD45RO+ Memory T Cells, CD56+ Natural Killer Cells, CD8+ Cytotoxic T cells, CD8+/CD45RA+ Naive Cytotoxic T Cells}
+\title{Annotations for sorted CD14+ Monocytes CD19+ B Cells, CD34+ Cells, CD4+
+Helper T Cells, CD4+/CD25+ Regulatory T Cells, CD4+/CD45RA+/CD25- Naive
+T cells, CD4+/CD45RO+ Memory T Cells, CD56+ Natural Killer Cells, CD8+
+Cytotoxic T cells, CD8+/CD45RA+ Naive Cytotoxic T Cells}
 \format{An object of class \code{character} of length 2140.}
 \source{
 \url{https://support.10xgenomics.com/single-cell-gene-expression/datasets}
@@ -12,6 +15,19 @@
 referenceAnnot
 }
 \description{
-Annotations for sorted CD14+ Monocytes CD19+ B Cells, CD34+ Cells, CD4+ Helper T Cells, CD4+/CD25+ Regulatory T Cells, CD4+/CD45RA+/CD25- Naive T cells, CD4+/CD45RO+ Memory T Cells, CD56+ Natural Killer Cells, CD8+ Cytotoxic T cells, CD8+/CD45RA+ Naive Cytotoxic T Cells
+Annotations for sorted CD14+ Monocytes CD19+ B Cells, CD34+ Cells, CD4+
+Helper T Cells, CD4+/CD25+ Regulatory T Cells, CD4+/CD45RA+/CD25- Naive
+T cells, CD4+/CD45RO+ Memory T Cells, CD56+ Natural Killer Cells, CD8+
+Cytotoxic T cells, CD8+/CD45RA+ Naive Cytotoxic T Cells
+}
+\examples{
+\dontrun{
+table(referenceAnnot)
+#referenceAnnot
+#        bcells     cytotoxict        memoryt      monocytes naivecytotoxic
+#           330            148            252            129             43
+#        naivet             nk    regulatoryt        thelper
+#            52            769            226            191
+}
 }
 \keyword{datasets}
