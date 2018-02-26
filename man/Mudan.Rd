@@ -17,21 +17,20 @@ library(MUDAN)
 data(pbmcA)
 cd <- pbmcA[, 1:500]
 myMudanObject <- Mudan$new("PBMCA", cd)
-myMudanObject$libSizeNormalize()
-myMudanObject$varianceNormalize(plot=TRUE)
-myMudanObject$dimensionalityReduction(maxit=1000)
-myMudanObject$communityDetection(communityName='Infomap',
-     communityMethod=igraph::cluster_infomap, k=10, minSize=10)
-myMudanObject$communityDetection(communityName='Walktrap',
-     communityMethod=igraph::cluster_walktrap, k=10, minSize=10)
-myMudanObject$modelCommunity()
-myMudanObject$getMudanEmbedding(plot=FALSE)
-myMudanObject$getStandardEmbedding(plot=FALSE)
-par(mfrow=c(2,2))
-myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='MUDAN')
-myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='MUDAN')
-myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='PCA')
-myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='PCA')
+myMudanObject$normalizeCounts()
+myMudanObject$normalizeVariance(plot=TRUE)
+myMudanObject$getPcs(nPcs=30, maxit=1000)
+myMudanObject$getComMembership(communityName='Infomap',
+     communityMethod=igraph::cluster_infomap, k=10)
+myMudanObject$getStableClusters(communityName='Infomap')
+myMudanObject$modelCommunity(communityName='Infomap')
+myMudanObject$getMudanEmbedding()
+myMudanObject$getStandardEmbedding()
+par(mfrow=c(1,2))
+myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='PCA'),
+     xlab=NULL, ylab=NULL, main='Standard')
+myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='MUDAN',
+     xlab=NULL, ylab=NULL, main='MUDAN')
 }
 
 }

@@ -5,21 +5,20 @@
 #' data(pbmcA)
 #' cd <- pbmcA[, 1:500]
 #' myMudanObject <- Mudan$new("PBMCA", cd)
-#' myMudanObject$libSizeNormalize()
-#' myMudanObject$varianceNormalize(plot=TRUE)
-#' myMudanObject$dimensionalityReduction(maxit=1000)
-#' myMudanObject$communityDetection(communityName='Infomap',
-#'      communityMethod=igraph::cluster_infomap, k=10, minSize=10)
-#' myMudanObject$communityDetection(communityName='Walktrap',
-#'      communityMethod=igraph::cluster_walktrap, k=10, minSize=10)
-#' myMudanObject$modelCommunity()
-#' myMudanObject$getMudanEmbedding(plot=FALSE)
-#' myMudanObject$getStandardEmbedding(plot=FALSE)
-#' par(mfrow=c(2,2))
-#' myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='MUDAN')
-#' myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='MUDAN')
-#' myMudanObject$plot(reductionType='pcs', communityName='Infomap', embeddingType='PCA')
-#' myMudanObject$plot(reductionType='pcs', communityName='Walktrap', embeddingType='PCA')
+#' myMudanObject$normalizeCounts()
+#' myMudanObject$normalizeVariance(plot=TRUE)
+#' myMudanObject$getPcs(nPcs=30, maxit=1000)
+#' myMudanObject$getComMembership(communityName='Infomap',
+#'      communityMethod=igraph::cluster_infomap, k=10)
+#' myMudanObject$getStableClusters(communityName='Infomap')
+#' myMudanObject$modelCommunity(communityName='Infomap')
+#' myMudanObject$getMudanEmbedding()
+#' myMudanObject$getStandardEmbedding()
+#' par(mfrow=c(1,2))
+#' myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='PCA'),
+#'      xlab=NULL, ylab=NULL, main='Standard')
+#' myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='MUDAN',
+#'      xlab=NULL, ylab=NULL, main='MUDAN')
 #' }
 #'
 #' @export
@@ -28,7 +27,6 @@ Mudan <- R6::R6Class(
     "Mudan",
     public = list(
         name = NULL,
-        counts = NULL,
         cd = NULL,
         mat = NULL,
         matnorm = NULL,
@@ -39,99 +37,110 @@ Mudan <- R6::R6Class(
         lds = NULL,
         com = NULL,
         model = NULL,
+        preds = NULL,
         emb = NULL,
 
+        gsf = NULL,
+        ods = NULL,
+        pv.sig = NULL,
 
         initialize =
             function(name = NA, counts = NA, verbose = TRUE, ncores=1, ...)
             {
                 self$name <- name
-                self$counts <- cleanCounts(counts, ...)
+                self$cd <- cleanCounts(counts, ...)
                 self$verbose <- verbose
                 self$ncores <- ncores
             },
 
-        libSizeNormalize =
+        normalizeCounts =
             function(...)
             {
-                self$cd <- normalizeCounts(self$counts, ...)
-                self$mat <- log10(self$cd+1)
+                self$mat <- normalizeCounts(self$cd, ...)
             },
 
-        varianceNormalize =
+        normalizeVariance =
             function(...)
             {
-                self$matnorm <- log10(normalizeVariance(self$cd, ...)+1)
+                matnorm.info <- normalizeVariance(self$mat, details=TRUE, ...) ## variance normalize
+                ## remember normalization parameters
+                gsf <- matnorm.info$df$gsf
+                names(gsf) <- rownames(matnorm.info$df)
+                self$gsf <- gsf
+                self$ods <- rownames(matnorm.info$mat)[matnorm.info$ods]
+                self$matnorm <- log10(matnorm.info$mat+1)
             },
 
-        dimensionalityReduction =
-            function(...)
+        getPcs =
+            function(nPcs=30, ...)
             {
-                self$pcs <- getPcs(self$matnorm, ...)
+                self$pcs <- getPcs(self$matnorm[self$ods,], nGenes=length(self$ods), nPcs=nPcs, ...)
             },
 
-        communityDetection =
-            function(reductionType='pcs', communityName="Infomap", communityMethod=igraph::cluster_infomap, k=30, minSize=5, ...)
+        getComMembership =
+            function(communityName="Infomap", communityMethod=igraph::cluster_infomap, k=15, ...)
             {
-                com <- getComMembership(self[[reductionType]], method=communityMethod, k=k, ...)
-
-                min.group.size <- minSize
-                bad.groups <- names(which(table(com) < min.group.size))
-                com[com %in% bad.groups] <- NA
-
+                com <- getComMembership(self$pcs, method=communityMethod, k=k, ...)
                 com <- factor(com)
 
-                self$com[[reductionType]][[communityName]] <- com
-            },
-
-        modelCommunity =
-            function(nGenes=min(1000, nrow(self$matnorm)*0.5), groups=NULL, communityName=NULL, ...)
-            {
-                vargenes <- getVariableGenes(self$matnorm, nGenes)
-                ## test all coms
-                if(is.null(groups)) {
-                    if(is.null(communityName)) {
-                        self$model <- lapply(self$com[['pcs']], function(c) {
-                                                 model <- modelLda(mat=self$mat[vargenes,], com=c)
-                                             })
-                    } else {
-                        self$model <- modelLda(self$mat[vargenes,], self$com[['pcs']][[communityName]], ...)
-                    }
-                } else {
-                    self$model <- modelLda(self$mat[vargenes,], groups, ...)
-                }
-            },
-
-        getMudanEmbedding =
-            function(...)
-            {
-                results <- tsneLda(mat=self$mat, model=self$model, details=TRUE, ...)
-                self$lds <- t(results$reduction)
-                self$emb[['MUDAN']] <- results$emb
+                self$com[[communityName]][['ALL']] <- com
             },
 
         getStandardEmbedding =
-            function(plot=TRUE, do.par=TRUE, ...)
-            {
-                pcs.emb <- Rtsne::Rtsne(self$pcs, is_distance=FALSE, num_threads=self$ncores)$Y
-                rownames(pcs.emb) <- rownames(self$pcs)
-                self$emb[['PCA']] <- pcs.emb
-                if(plot) {
-                    if(do.par) {
-                        par(mar = c(0.5,0.5,2.0,0.5), mgp = c(2,0.65,0), cex = 1.0);
-                    }
-                    plotEmbedding(pcs.emb, ...)
-                }
+          function(perplexity)
+          {
+            emb <- Rtsne::Rtsne(self$pcs, is_distance=FALSE, perplexity=30, verbose=TRUE)$Y ## get tSNE embedding on PCs
+            rownames(emb) <- rownames(self$pcs)
+            self$emb[['PCA']] <- emb
+          },
 
+        getStableClusters =
+          function(communityName="Infomap", min.group.size=10, min.diff.genes=10, z.threshold=3, ...)
+          {
+            ## get stable clusters
+            comA <- getStableClusters(self$cd,
+                                      self$com[[communityName]][['ALL']],
+                                      self$matnorm,
+                                      min.group.size=min.group.size,
+                                      min.diff.genes=min.diff.genes,
+                                      z.threshold=z.threshold,
+                                      ...)
+            self$com[[communityName]][['STABLE']] <- comA$com
+            self$pv.sig[[communityName]] <- comA$pv.sig
+          },
+
+        modelCommunity =
+            function(communityName="Infomap", groups=NULL, ...)
+            {
+              genes <- intersect(unique(unlist(self$pv.sig[[communityName]])), rownames(self$matnorm)) ## train on detected significantly differentially expressed genes among stable clusters
+              mn <- self$matnorm[genes,]
+
+              if(is.null(groups)) {
+                  self$model <- modelLda(mat=mn, com=self$com[[communityName]][['STABLE']], retest=FALSE, ...)
+              } else {
+                  self$model <- modelLda(mat=mn, com=groups, retest=FALSE, ...)
+              }
             },
 
-        plot =
-            function(reductionType, groups=NULL, communityName, embeddingType, ...)
+        getMudanEmbedding =
+            function(perplexity=30, ...)
+            {
+                self$preds <- predict(self$model, data.frame(t(log10(as.matrix(self$mat[names(self$gsf),]*self$gsf+1)))))
+                self$lds <- self$preds$x
+
+                emb.lds <- Rtsne::Rtsne(self$lds, is_distance=FALSE, perplexity=perplexity, verbose=TRUE, ...)$Y ## get tSNE embedding on PCs
+                rownames(emb.lds) <- rownames(self$lds)
+
+                self$emb[['MUDAN']] <- emb.lds
+            },
+
+        plotEmbedding =
+            function(groups=NULL, embeddingType, communityName, communityType='STABLE', ...)
             {
                 if(is.null(groups)) {
-                    plotEmbedding(self$emb[[embeddingType]], groups=self$com[[reductionType]][[communityName]], ...)
+                    plotEmbedding(self$emb[[embeddingType]], groups=self$com[[communityName]][[communityType]], ...)
                 } else {
-                  plotEmbedding(self$emb[[embeddingType]], groups=groups, ...)
+                    plotEmbedding(self$emb[[embeddingType]], groups=groups, ...)
                 }
             }
     )
