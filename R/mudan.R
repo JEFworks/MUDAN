@@ -912,6 +912,45 @@ getConfidentPreds <- function(posterior, t=0.95) {
 }
 
 
+#' Merge a list of group annotations
+#'
+#' @param pred.com List of group annotations
+#' @param min.group.size Minumum group size
+#' @param t Percentage increase in entropy that must be achieved to merge annotations
+#'
+#' @export
+#'
+mergePredsList <- function(pred.com, min.group.size=30, t=0.1) {
+
+  ## order from greatest number of distinct groups to least
+  order <- sort(sapply(pred.com, function(x) length(table(x))), decreasing=TRUE)
+  pred.com <- pred.com[names(order)]
+
+  ## merge only if it increases entropy (adds more information)
+  preds.com.init <- pred.com[[1]]
+  for(i in 2:length(pred.com)) {
+    com.test1 <- preds.com.init
+    entropy1 <- entropy::entropy(table(com.test1))
+
+    com.test2 <- pred.com[[i]]
+    bar <- cbind(as.character(com.test1), as.character(com.test2[names(com.test1)]))
+    rownames(bar) <- names(com.test1)
+    bar <- na.omit(bar)
+    foo <- apply(bar, 1, paste, collapse=".")
+    names(foo) <- rownames(bar)
+    foo[foo %in% names(which(table(foo)<min.group.size))] <- NA
+    entropy2 <- entropy::entropy(table(foo))
+
+    if((entropy2 - entropy1) > entropy1*t) {
+      preds.com.init <<- foo
+    }
+  }
+  com.all <- factor(preds.com.init)
+
+  return(com.all)
+}
+
+
 #' Batch correct within identified groups using ComBat
 #'
 #' @param lds.all Matrix to be batch corrected
