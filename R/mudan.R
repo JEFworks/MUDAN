@@ -933,7 +933,7 @@ clusterBasedBatchCorrect <- function(lds.all, batch, com.final, min.group.size=1
       lds.all[cells,]
     }
   }))
-  lds.bc <- cbind(lds.bc, lds.all[,nas])
+  lds.bc <- rbind(lds.bc, lds.all[nas,])
   return(lds.bc)
 }
 
