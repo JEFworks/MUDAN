@@ -15,7 +15,7 @@
 #' myMudanObject$getMudanEmbedding()
 #' myMudanObject$getStandardEmbedding()
 #' par(mfrow=c(1,2))
-#' myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='PCA'),
+#' myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='PCA',
 #'      xlab=NULL, ylab=NULL, main='Standard')
 #' myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='MUDAN',
 #'      xlab=NULL, ylab=NULL, main='MUDAN')
