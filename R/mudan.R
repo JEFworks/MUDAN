@@ -429,7 +429,7 @@ getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igra
     df.sub <- data.frame(celltype=com.sub, pcs.sub)
     model <- MASS::lda(celltype ~ ., data=df.sub)
     df.all <- data.frame(mat)
-    model.output <- MASS::predict(model, df.all)
+    model.output <- stats::predict(model, df.all)
     com.all <- model.output$class
     names(com.all) <- rownames(df.all)
     if(verbose) {
@@ -491,7 +491,7 @@ modelLda <- function(mat, com, nfeatures=nrow(mat), random=FALSE, verbose=TRUE, 
 
   if(retest) {
     ## predict our data based on model
-    model.output <- MASS::predict(model, df)
+    model.output <- stats::predict(model, df)
     if(verbose) {
       print("LDA prediction accuracy ...")
       print(table(model.output$class==com))
@@ -887,7 +887,7 @@ predictLds <- function(mat, model, gsf, verbose=TRUE) {
   colnames(mat.test) <- colnames(mat)
   mat.test[gsf.have,] <- as.matrix(mat[gsf.have,])
 
-  pred <- MASS::predict(model, data.frame(t(log10(mat.test*gsf+1))))
+  pred <- stats::predict(model, data.frame(t(log10(mat.test*gsf+1))))
 }
 
 
@@ -1005,7 +1005,7 @@ tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=T
     colnames(mat.temp) <- genes.need
     genes.have <- intersect(genes.need, colnames(matm))
     mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
-    MASS::predict(model, data.frame(mat.temp))$x
+    stats::predict(model, data.frame(mat.temp))$x
   }
   if(class(model)=='list') {
     reduction <- do.call(cbind, lapply(model, function(m) {
@@ -1015,7 +1015,7 @@ tsneLda <- function(mat, model, perplexity=30, verbose=TRUE, plot=TRUE, do.par=T
       colnames(mat.temp) <- genes.need
       genes.have <- intersect(genes.need, colnames(matm))
       mat.temp[rownames(matm), genes.have] <- matm[, genes.have]
-      MASS::predict(m, data.frame(mat.temp))$x
+      stats::predict(m, data.frame(mat.temp))$x
     }))
   }
 
