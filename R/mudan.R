@@ -33,7 +33,9 @@ cleanCounts <- function(
 ) {
 
   if (!class(counts) %in% c("dgCMatrix", "dgTMatrix")) {
-    message('Converting to sparse matrix ...')
+    if(verbose) {
+      message('Converting to sparse matrix ...')
+    }
     counts <- Matrix::Matrix(counts, sparse = TRUE)
   }
 
@@ -81,17 +83,19 @@ cleanCounts <- function(
 #' @importFrom Matrix Matrix colSums t
 normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 
+  if (!class(counts) %in% c("dgCMatrix", "dgTMatrix")) {
+    if(verbose) {
+      message('Converting to sparse matrix ...')
+    }
+    counts <- Matrix::Matrix(counts, sparse = TRUE)
+  }
+
   if (verbose) {
     message('Normalizing matrix with ', ncol(counts), ' cells and ', nrow(counts), ' genes')
   }
 
-  if (class(counts) %in% c("dgCMatrix", "dgTMatrix")) {
-    counts <- Matrix::t(Matrix::t(counts) / Matrix::colSums(counts))
-    counts <- counts * depthScale
-  } else {
-    counts <- t(t(counts) / colSums(counts))
-    counts <- counts * depthScale
-  }
+  counts <- Matrix::t(Matrix::t(counts) / Matrix::colSums(counts))
+  counts <- counts * depthScale
 
   return(counts)
 }
@@ -128,7 +132,15 @@ normalizeCounts <- function(counts, depthScale=1e6, verbose=TRUE) {
 #' @export
 #'
 normalizeVariance <- function(counts, gam.k=5, alpha=0.05, plot=FALSE, use.unadjusted.pvals=FALSE, do.par=TRUE, max.adjusted.variance=1e3, min.adjusted.variance=1e-3, verbose=TRUE, details=FALSE) {
-  mat <- t(counts) ## make rows as cells, cols as genes
+
+  if (!class(counts) %in% c("dgCMatrix", "dgTMatrix")) {
+    if(verbose) {
+      message('Converting to sparse matrix ...')
+    }
+    counts <- Matrix::Matrix(counts, sparse = TRUE)
+  }
+
+  mat <- Matrix::t(counts) ## make rows as cells, cols as genes
 
   if(verbose) {
     print("Calculating variance fit ...")
@@ -542,12 +554,12 @@ getDifferentialGenes <- function(cd, cols, verbose=TRUE) {
   ##xr <- sparse_matrix_column_ranks(cm);
 
   # calculate rank sums per group
-  grs <- do.call(rbind, lapply(levels(cols), function(g) colSums(xr[cols==g,])))
+  grs <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(xr[cols==g,])))
   rownames(grs) <- levels(cols); colnames(grs) <- colnames(xr)
   ##grs <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
 
   # calculate number of non-zero entries per group
-  gnzz <- do.call(rbind, lapply(levels(cols), function(g) colSums(xr[cols==g,]>0)))
+  gnzz <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(xr[cols==g,]>0)))
   rownames(gnzz) <- levels(cols); colnames(gnzz) <- colnames(xr)
   #xr@x <- numeric(length(xr@x))+1
   #gnzz <- colSumByFac(xr,as.integer(cols))[-1,,drop=F]
@@ -584,8 +596,8 @@ getDifferentialGenes <- function(cd, cols, verbose=TRUE) {
   colnames(x) <- levels(cols)[1:ncol(x)]
 
   # add fold change information
-  log.gene.av <- log2(colMeans(cm));
-  group.gene.av <- do.call(rbind, lapply(levels(cols), function(g) colSums(cm[cols==g,]>0))) / (group.size+1);
+  log.gene.av <- log2(Matrix::colMeans(cm));
+  group.gene.av <- do.call(rbind, lapply(levels(cols), function(g) Matrix::colSums(cm[cols==g,]>0))) / (group.size+1);
   log2.fold.change <- log2(t(group.gene.av)) - log.gene.av;
   # fraction of cells expressing
   f.expressing <- t(gnzz / group.size);
@@ -731,8 +743,10 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
 #'
 getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.group.size=10, min.diff.genes=nrow(cd)*0.005, max.iter=10, verbose=TRUE, plot=FALSE) {
 
-  if(min.group.size>1) { com[com %in% levels(com)[unlist(tapply(com,com,length))<min.group.size]] <- NA; com <- droplevels(com); }
-  com <- as.factor(com)[colnames(cd)]
+  if(min.group.size>1) {
+    com[com %in% levels(com)[table(com)<min.group.size]] <- NA
+  }
+  com <- as.factor(com[colnames(cd)])
 
   ## compute differentially expressed genes between two branches of dendrogram
   compare <- function(dend) {
@@ -755,7 +769,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     return(dg.sig)
   }
   ## recursively trace dendrogram
-  pv.recur <- function(dend) {
+  pv.recur <- function(dend, pv.sig.all) {
     ## compares leaves of tree (groups)
     if(is.leaf(dend[[1]]) & is.leaf(dend[[2]])) {
       g1 <- paste0(labels(dend[[1]]), collapse=":")
@@ -775,11 +789,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
         if(verbose) {
           print(paste0('Merging ', g1, ' and ', g2))
         }
-        com.fin[com.fin==g1] <<- paste0(g1,'.', g2)
-        com.fin[com.fin==g2] <<- paste0(g1,'.', g2)
+        com.fin[com.fin==g1] <- paste0(g1,'.', g2)
+        com.fin[com.fin==g2] <- paste0(g1,'.', g2)
       }
-      pv.sig.all[[g1]] <<- dg.sig
-      pv.sig.all[[g2]] <<- dg.sig
+      pv.sig.all[[g1]] <- dg.sig
+      pv.sig.all[[g2]] <- dg.sig
     } else {
       ## if only one is leaf, compare to entire other branch
       if(is.leaf(dend[[1]])) {
@@ -802,9 +816,9 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           }
           com.fin[com.fin==g1] <<- NA
         }
-        pv.sig.all[[g1]] <<- dg.sig
+        pv.sig.all[[g1]] <- dg.sig
       } else {
-        pv.recur(dend[[1]])
+        pv.recur(dend[[1]], pv.sig.all)
       }
       if(is.leaf(dend[[2]])) {
         g1 <- paste0(labels(dend[[1]]), collapse=".")
@@ -823,11 +837,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           if(verbose) {
             print(paste0('Cannot distinguish ', g1, ' and ', g2))
           }
-          com.fin[com.fin==g2] <<- NA
+          com.fin[com.fin==g2] <- NA
         }
-        pv.sig.all[[g2]] <<- dg.sig
+        pv.sig.all[[g2]] <- dg.sig
       } else {
-        pv.recur(dend[[2]])
+        pv.recur(dend[[2]], pv.sig.all)
       }
     }
   }
@@ -838,7 +852,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     ## average within groups
     mat.summary <- do.call(cbind, lapply(levels(com), function(ct) {
       cells <- which(com==ct)
-      rowMeans(matnorm[, cells])
+      if(length(cells) > 1) {
+        Matrix::rowMeans(matnorm[, cells])
+      } else {
+        matnorm[,cells]
+      }
     }))
     colnames(mat.summary) <- levels(com)
     ## cluster groups
@@ -848,7 +866,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     com.fin <- as.character(com)
     names(com.fin) <- names(com)
     pv.sig.all <- list()
-    pv.recur(dend)
+    pv.recur(dend, pv.sig.all)
     ## test if converged
     if(i>max.iter) {
       break

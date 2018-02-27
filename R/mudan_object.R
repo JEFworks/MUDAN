@@ -9,7 +9,7 @@
 #' myMudanObject$normalizeVariance(plot=TRUE)
 #' myMudanObject$getPcs(nPcs=30, maxit=1000)
 #' myMudanObject$getComMembership(communityName='Infomap',
-#'      communityMethod=igraph::cluster_infomap, k=1/200*ncol(cd))
+#'      communityMethod=igraph::cluster_infomap, k=30)
 #' myMudanObject$getStableClusters(communityName='Infomap')
 #' myMudanObject$modelCommunity(communityName='Infomap')
 #' myMudanObject$getMudanEmbedding()
