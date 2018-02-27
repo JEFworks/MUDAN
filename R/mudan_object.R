@@ -1,6 +1,6 @@
 #' R6 object for storing all relevant output from MUDAN analysis in single entity
 #'
-#' @examples \dontrun{
+#' @examples {
 #' library(MUDAN)
 #' data(pbmcA)
 #' cd <- pbmcA
@@ -9,7 +9,7 @@
 #' myMudanObject$normalizeVariance(plot=TRUE)
 #' myMudanObject$getPcs(nPcs=30, maxit=1000)
 #' myMudanObject$getComMembership(communityName='Infomap',
-#'      communityMethod=igraph::cluster_infomap, k=30)
+#'      communityMethod=igraph::cluster_infomap, k=1/200*ncol(cd))
 #' myMudanObject$getStableClusters(communityName='Infomap')
 #' myMudanObject$modelCommunity(communityName='Infomap')
 #' myMudanObject$getMudanEmbedding()
@@ -112,7 +112,8 @@ Mudan <- R6::R6Class(
         modelCommunity =
             function(communityName="Infomap", groups=NULL, ...)
             {
-              genes <- intersect(unique(unlist(self$pv.sig[[communityName]])), rownames(self$matnorm)) ## train on detected significantly differentially expressed genes among stable clusters
+              pv.sig.genes <- lapply(self$pv.sig[[communityName]], function(x) unique(unlist(lapply(x, rownames))))
+              genes <- intersect(unique(unlist(pv.sig.genes)), rownames(matnorm))
               mn <- self$matnorm[genes,]
 
               if(is.null(groups)) {

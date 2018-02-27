@@ -1,0 +1,180 @@
+---
+title: "Multi-sample Unified Discriminant Analysis"
+author: "Jean Fan"
+date: "February 27, 2018"
+output:
+  pdf_document: default
+---
+
+```{r}
+library(MUDAN)
+
+## load data
+data(pbmcA)
+A <- pbmcA[,1:1000]
+## b cells identified from previous analysis
+b.cells.pbmcA <- c("frozen_pbmc_donor_a_AAACATTGGCTAAC", "frozen_pbmc_donor_a_AAACCGTGTTACCT",
+                   "frozen_pbmc_donor_a_AAACGCACTTCTAC", "frozen_pbmc_donor_a_AAAGACGAATGACC",
+                   "frozen_pbmc_donor_a_AAAGGCCTCGAACT", "frozen_pbmc_donor_a_AAAGGCCTTGACCA",
+                   "frozen_pbmc_donor_a_AAATCCCTAACCAC", "frozen_pbmc_donor_a_AAATGTTGAGATGA",
+                   "frozen_pbmc_donor_a_AAATTCGAATTTCC", "frozen_pbmc_donor_a_AACACGTGCCCTTG",
+                   "frozen_pbmc_donor_a_AACACTCTAGCAAA", "frozen_pbmc_donor_a_AACAGAGACTCGCT",
+                   "frozen_pbmc_donor_a_AACCACGAAACAGA", "frozen_pbmc_donor_a_AACCACGAATGCTG",
+                   "frozen_pbmc_donor_a_AACCGATGTGTGGT", "frozen_pbmc_donor_a_AACCGCCTGTTGTG",
+                   "frozen_pbmc_donor_a_AACGCCCTTTCGGA", "frozen_pbmc_donor_a_AACGTGTGGTAGCT",
+                   "frozen_pbmc_donor_a_AACTGTCTACCAAC", "frozen_pbmc_donor_a_AAGCAAGAGATAGA",
+                   "frozen_pbmc_donor_a_AAGTAGGAAACCGT", "frozen_pbmc_donor_a_AATCCTTGCGAATC",
+                   "frozen_pbmc_donor_a_AATCTCACCTCGAA", "frozen_pbmc_donor_a_AATGATACAGCACT",
+                   "frozen_pbmc_donor_a_ACACCCTGAAAACG", "frozen_pbmc_donor_a_ACAGGTACTAGCGT",
+                   "frozen_pbmc_donor_a_ACAGTCGAATGACC", "frozen_pbmc_donor_a_ACATTCTGGTACCA",
+                   "frozen_pbmc_donor_a_ACCATTACTGTTTC", "frozen_pbmc_donor_a_ACCCAAGAGCCTTC",
+                   "frozen_pbmc_donor_a_ACCTGGCTATCACG", "frozen_pbmc_donor_a_ACGAACACGAGCTT",
+                   "frozen_pbmc_donor_a_ACGATTCTCCTACC", "frozen_pbmc_donor_a_ACGATTCTGTTCTT",
+                   "frozen_pbmc_donor_a_ACGCACCTGTCATG", "frozen_pbmc_donor_a_ACGCACCTTTGGCA",
+                   "frozen_pbmc_donor_a_ACGCTCACTGACAC", "frozen_pbmc_donor_a_ACGGATTGACGTAC",
+                   "frozen_pbmc_donor_a_ACTATCACGGTGGA", "frozen_pbmc_donor_a_AGACACACCCCTTG",
+                   "frozen_pbmc_donor_a_AGACTTCTCTGGAT", "frozen_pbmc_donor_a_AGATTAACCCTGAA",
+                   "frozen_pbmc_donor_a_AGCATCGACCTTTA", "frozen_pbmc_donor_a_AGGACACTTAACCG",
+                   "frozen_pbmc_donor_a_AGGGACGAAAACAG", "frozen_pbmc_donor_a_AGGTTGTGGAGGAC",
+                   "frozen_pbmc_donor_a_AGTCACGAAAGATG", "frozen_pbmc_donor_a_AGTGTGACTTGACG",
+                   "frozen_pbmc_donor_a_AGTTTAGATCGCCT", "frozen_pbmc_donor_a_AGTTTCACTTGCGA",
+                   "frozen_pbmc_donor_a_ATAGGCTGAGTTCG", "frozen_pbmc_donor_a_ATAGGCTGGCGAGA",
+                   "frozen_pbmc_donor_a_ATCAACCTGGTGGA", "frozen_pbmc_donor_a_ATCAGGTGGAGATA",
+                   "frozen_pbmc_donor_a_ATCCAGGAGCAAGG", "frozen_pbmc_donor_a_ATCCCGTGTGTAGC",
+                   "frozen_pbmc_donor_a_ATCCTAACCAGAAA", "frozen_pbmc_donor_a_ATCGCCACGAATCC",
+                   "frozen_pbmc_donor_a_ATCTACTGCAGAAA", "frozen_pbmc_donor_a_ATCTCAACGGTTTG",
+                   "frozen_pbmc_donor_a_ATGAGCACACCACA", "frozen_pbmc_donor_a_ATGGACACTGGAGG",
+                   "frozen_pbmc_donor_a_ATGTACCTGTGTTG", "frozen_pbmc_donor_a_ATGTCACTGTCGAT",
+                   "frozen_pbmc_donor_a_ATGTTGCTCGGGAA", "frozen_pbmc_donor_a_ATTAGTGAAGCGGA",
+                   "frozen_pbmc_donor_a_ATTCAGCTGTCCTC", "frozen_pbmc_donor_a_ATTCTTCTGAAAGT",
+                   "frozen_pbmc_donor_a_ATTTCCGATCAGTG", "frozen_pbmc_donor_a_CAAGGACTACCCAA",
+                   "frozen_pbmc_donor_a_CAAGTTCTGTTTCT", "frozen_pbmc_donor_a_CACAGATGCCATAG",
+                   "frozen_pbmc_donor_a_CACCACTGTGGTGT", "frozen_pbmc_donor_a_CACCGGGACTTGAG",
+                   "frozen_pbmc_donor_a_CACCGTTGTCGTTT", "frozen_pbmc_donor_a_CACTCCGAGTCACA",
+                   "frozen_pbmc_donor_a_CACTTATGTTGTGG", "frozen_pbmc_donor_a_CAGACTGAATAAGG",
+                   "frozen_pbmc_donor_a_CAGACTGACGACTA")
+A <- A[, setdiff(colnames(A), b.cells.pbmcA)]
+dim(A)
+
+data(pbmcB)
+B <- pbmcB[,1:1000]
+data(pbmcC)
+C <- pbmcC[,1:1000]
+cds <- list(A, B, C)
+names(cds) <- c('A', 'B', 'C')
+
+## combine
+k <- 0
+vi <- Reduce(intersect, lapply(cds, function(cd) {
+  vi <- rowSums(cd)>k
+  rownames(cd)[vi]
+}))
+cds.filter <- lapply(cds, function(cd) cd[vi,])
+names(cds.filter)
+sample <- unlist(lapply(1:length(cds.filter), function(i) {
+  cd <- cds.filter[[i]]
+  n <- names(cds.filter)[i]
+  sample <- rep(n, ncol(cd))
+  names(sample) <- colnames(cd)
+  return(sample)
+}))
+```
+
+```{r}
+## run model for each
+getModelInfo <- function(name, cd) {
+  myMudanObject <- Mudan$new(name, cd)
+  myMudanObject$normalizeCounts()
+  myMudanObject$normalizeVariance(plot=FALSE)
+  myMudanObject$getPcs(nPcs=30, maxit=1000)
+  myMudanObject$getComMembership(communityName='Infomap',
+       communityMethod=igraph::cluster_infomap, k=30)
+  myMudanObject$getStableClusters(communityName='Infomap')
+  myMudanObject$modelCommunity(communityName='Infomap')
+  myMudanObject$getMudanEmbedding()
+  myMudanObject$getStandardEmbedding()
+  par(mfrow=c(1,2))
+  myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='PCA',
+                              xlab=NULL, ylab=NULL, main='Standard')
+  myMudanObject$plotEmbedding(communityName='Infomap', embeddingType='MUDAN',
+                              xlab=NULL, ylab=NULL, main='MUDAN')
+  return(myMudanObject)
+}
+models.info <- lapply(seq_along(cds.filter), function(i) {
+  getModelInfo(names(cds.filter)[i], cds.filter[[i]])
+})
+
+## Plot with individual cluster annotations
+par(mfrow=c(length(models.info),length(models.info)), mar=rep(1,4))
+lapply(1:length(models.info), function(i) {
+  lapply(1:length(models.info), function(j) {
+    plotEmbedding(models.info[[i]]$emb$PCA, groups=pred.com[[j]], mark.clusters=TRUE, mark.cluster.cex = 1)
+  })
+})
+```
+
+```{r}
+## combine all
+cds.all <- do.call(cbind, cds.filter)
+mat.all <- normalizeCounts(cds.all)
+preds <- lapply(models.info, function(modelA.info) {
+  predictLds(mat.all, modelA.info$model, modelA.info$gsf)
+})
+pred.com <- lapply(preds, function(p) {
+  getConfidentPreds(p$posterior)
+})
+names(pred.com) <- names(cds)
+## Lds
+lds.all <- do.call(cbind, lapply(preds, function(p) p$x))
+
+## Combine preds coms (use Ilya's idea of iterative refining)
+com.all <- mergePredsList(pred.com=pred.com, min.group.size=10, t=1e-6)
+
+## Reassess stability
+comA <- getStableClusters(cds.all, com.all, mat.all, min.group.size=10, min.diff.genes=10, z.threshold=1.96)
+com.all.final <- factor(comA$com)
+names(com.all.final) <- colnames(cds.all)
+length(com.all.final)
+
+## Clean up
+com.sub <- na.omit(com.all.final)
+df.sub <- data.frame(celltype=com.sub, lds.all[names(com.sub),])
+model <- MASS::lda(celltype ~ ., data=df.sub)
+model.output <- predict(model, data.frame(lds.all))
+com.all.fin <- model.output$class
+names(com.all.fin) <- rownames(lds.all)
+
+## Plot with joint clustering
+lapply(1:length(models.info), function(i) {
+  plotEmbedding(models.info[[i]]$emb$PCA, groups=com.all.fin, mark.clusters=TRUE, mark.cluster.cex = 1)
+})
+```
+
+```{r}
+## Get common embedding
+dim(lds.all)
+length(com.all.fin)
+lds.bc <- clusterBasedBatchCorrect(lds.all, sample, com.all.fin, min.group.size=30)
+dim(lds.bc)
+emb.lds.bc <- Rtsne::Rtsne(lds.bc,
+                           is_distance=FALSE,
+                           perplexity=30,
+                           num_threads=10,
+                           verbose=FALSE)$Y
+rownames(emb.lds.bc) <- rownames(lds.bc)
+
+## final plot
+par(mfrow=c(3,3))
+## combined embedding with individual predicted cluster annotations
+plotEmbedding(emb.lds.bc, groups=pred.com[[1]], mark.clusters=TRUE, mark.cluster.cex = 1)
+plotEmbedding(emb.lds.bc, groups=pred.com[[2]], mark.clusters=TRUE, mark.cluster.cex = 1)
+plotEmbedding(emb.lds.bc, groups=pred.com[[3]], mark.clusters=TRUE, mark.cluster.cex = 1)
+## individual embedding with combined cluster annotations
+plotEmbedding(models.info[[1]]$emb$PCA, groups=com.all.fin, mark.clusters=TRUE, mark.cluster.cex = 1)
+plotEmbedding(models.info[[2]]$emb$PCA, groups=com.all.fin, mark.clusters=TRUE, mark.cluster.cex = 1)
+plotEmbedding(models.info[[3]]$emb$PCA, groups=com.all.fin, mark.clusters=TRUE, mark.cluster.cex = 1)
+## combined embedding
+plotEmbedding(emb.lds.bc, groups=com.all, mark.clusters=TRUE, mark.cluster.cex = 1)
+plotEmbedding(emb.lds.bc, groups=com.all.fin, mark.clusters=TRUE, mark.cluster.cex = 1)
+plotEmbedding(emb.lds.bc, groups=sample, mark.clusters=TRUE, mark.cluster.cex = 1)
+```

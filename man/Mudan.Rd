@@ -12,7 +12,7 @@ Mudan
 R6 object for storing all relevant output from MUDAN analysis in single entity
 }
 \examples{
-\dontrun{
+{
 library(MUDAN)
 data(pbmcA)
 cd <- pbmcA
@@ -21,7 +21,7 @@ myMudanObject$normalizeCounts()
 myMudanObject$normalizeVariance(plot=TRUE)
 myMudanObject$getPcs(nPcs=30, maxit=1000)
 myMudanObject$getComMembership(communityName='Infomap',
-     communityMethod=igraph::cluster_infomap, k=30)
+     communityMethod=igraph::cluster_infomap, k=1/200*ncol(cd))
 myMudanObject$getStableClusters(communityName='Infomap')
 myMudanObject$modelCommunity(communityName='Infomap')
 myMudanObject$getMudanEmbedding()

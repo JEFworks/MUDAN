@@ -841,7 +841,6 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
       rowMeans(matnorm[, cells])
     }))
     colnames(mat.summary) <- levels(com)
-    dim(mat.summary)
     ## cluster groups
     hc <- hclust(dist(t(mat.summary)), method=hclust.method)
     if(plot) { plot(hc) }
@@ -920,14 +919,19 @@ getConfidentPreds <- function(posterior, t=0.95) {
 #'
 #' @export
 #'
-mergePredsList <- function(pred.com, min.group.size=30, t=0.1) {
+mergePredsList <- function(pred.com, min.group.size=30, t=0.1, verbose=TRUE) {
+
+  ## need to be named to sort
+  if(is.null(names(pred.com))) {
+    names(pred.com) <- seq_len(length(pred.com))
+  }
 
   ## order from greatest number of distinct groups to least
   order <- sort(sapply(pred.com, function(x) length(table(x))), decreasing=TRUE)
   pred.com <- pred.com[names(order)]
 
   ## merge only if it increases entropy (adds more information)
-  preds.com.init <- pred.com[[1]]
+  preds.com.init <<- pred.com[[1]]
   for(i in 2:length(pred.com)) {
     com.test1 <- preds.com.init
     entropy1 <- entropy::entropy(table(com.test1))
@@ -941,11 +945,21 @@ mergePredsList <- function(pred.com, min.group.size=30, t=0.1) {
     foo[foo %in% names(which(table(foo)<min.group.size))] <- NA
     entropy2 <- entropy::entropy(table(foo))
 
+    if(verbose) {
+      print("Former entropy:")
+      print(entropy1)
+      print("New entropy:")
+      print(entropy2)
+    }
     if((entropy2 - entropy1) > entropy1*t) {
       preds.com.init <<- foo
+      if(verbose) {
+        print("Merge")
+        print(table(foo))
+      }
     }
   }
-  com.all <- factor(preds.com.init)
+  com.all <<- factor(preds.com.init)
 
   return(com.all)
 }

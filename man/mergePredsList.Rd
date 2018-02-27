@@ -4,7 +4,7 @@
 \alias{mergePredsList}
 \title{Merge a list of group annotations}
 \usage{
-mergePredsList(pred.com, min.group.size = 30, t = 0.1)
+mergePredsList(pred.com, min.group.size = 30, t = 0.1, verbose = TRUE)
 }
 \arguments{
 \item{pred.com}{List of group annotations}
