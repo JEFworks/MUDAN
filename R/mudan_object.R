@@ -3,10 +3,10 @@
 #' @examples {
 #' library(MUDAN)
 #' data(pbmcA)
-#' cd <- pbmcA
+#' cd <- pbmcA[, 1:500]
 #' myMudanObject <- Mudan$new("PBMCA", cd)
 #' myMudanObject$normalizeCounts()
-#' myMudanObject$normalizeVariance(plot=TRUE)
+#' myMudanObject$normalizeVariance(plot=FALSE)
 #' myMudanObject$getPcs(nPcs=30, maxit=1000)
 #' myMudanObject$getComMembership(communityName='Infomap',
 #'      communityMethod=igraph::cluster_infomap, k=30)
@@ -112,11 +112,10 @@ Mudan <- R6::R6Class(
         modelCommunity =
             function(communityName="Infomap", groups=NULL, ...)
             {
-              pv.sig.genes <- lapply(self$pv.sig[[communityName]], function(x) unique(unlist(lapply(x, rownames))))
-              genes <- intersect(unique(unlist(pv.sig.genes)), rownames(matnorm))
-              mn <- self$matnorm[genes,]
-
               if(is.null(groups)) {
+                  pv.sig.genes <- lapply(self$pv.sig[[communityName]], function(x) unique(unlist(lapply(x, rownames))))
+                  genes <- intersect(unique(unlist(pv.sig.genes)), rownames(self$matnorm))
+                  mn <- self$matnorm[genes,]
                   self$model <- modelLda(mat=mn, com=self$com[[communityName]][['STABLE']], retest=FALSE, ...)
               } else {
                   self$model <- modelLda(mat=mn, com=groups, retest=FALSE, ...)

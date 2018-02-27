@@ -769,7 +769,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     return(dg.sig)
   }
   ## recursively trace dendrogram
-  pv.recur <- function(dend, pv.sig.all) {
+  pv.recur <- function(dend) {
     ## compares leaves of tree (groups)
     if(is.leaf(dend[[1]]) & is.leaf(dend[[2]])) {
       g1 <- paste0(labels(dend[[1]]), collapse=":")
@@ -789,11 +789,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
         if(verbose) {
           print(paste0('Merging ', g1, ' and ', g2))
         }
-        com.fin[com.fin==g1] <- paste0(g1,'.', g2)
-        com.fin[com.fin==g2] <- paste0(g1,'.', g2)
+        com.fin[com.fin==g1] <<- paste0(g1,'.', g2)
+        com.fin[com.fin==g2] <<- paste0(g1,'.', g2)
       }
-      pv.sig.all[[g1]] <- dg.sig
-      pv.sig.all[[g2]] <- dg.sig
+      pv.sig.all[[g1]] <<- dg.sig
+      pv.sig.all[[g2]] <<- dg.sig
     } else {
       ## if only one is leaf, compare to entire other branch
       if(is.leaf(dend[[1]])) {
@@ -816,9 +816,9 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           }
           com.fin[com.fin==g1] <<- NA
         }
-        pv.sig.all[[g1]] <- dg.sig
+        pv.sig.all[[g1]] <<- dg.sig
       } else {
-        pv.recur(dend[[1]], pv.sig.all)
+        pv.recur(dend[[1]])
       }
       if(is.leaf(dend[[2]])) {
         g1 <- paste0(labels(dend[[1]]), collapse=".")
@@ -837,11 +837,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
           if(verbose) {
             print(paste0('Cannot distinguish ', g1, ' and ', g2))
           }
-          com.fin[com.fin==g2] <- NA
+          com.fin[com.fin==g2] <<- NA
         }
-        pv.sig.all[[g2]] <- dg.sig
+        pv.sig.all[[g2]] <<- dg.sig
       } else {
-        pv.recur(dend[[2]], pv.sig.all)
+        pv.recur(dend[[2]])
       }
     }
   }
@@ -866,7 +866,7 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     com.fin <- as.character(com)
     names(com.fin) <- names(com)
     pv.sig.all <- list()
-    pv.recur(dend, pv.sig.all)
+    pv.recur(dend)
     ## test if converged
     if(i>max.iter) {
       break
@@ -934,6 +934,7 @@ getConfidentPreds <- function(posterior, t=0.95) {
 #' @param pred.com List of group annotations
 #' @param min.group.size Minumum group size
 #' @param t Percentage increase in entropy that must be achieved to merge annotations
+#' @param verbose Verbosity
 #'
 #' @export
 #'
@@ -949,7 +950,7 @@ mergePredsList <- function(pred.com, min.group.size=30, t=0.1, verbose=TRUE) {
   pred.com <- pred.com[names(order)]
 
   ## merge only if it increases entropy (adds more information)
-  preds.com.init <<- pred.com[[1]]
+  preds.com.init <- pred.com[[1]]
   for(i in 2:length(pred.com)) {
     com.test1 <- preds.com.init
     entropy1 <- entropy::entropy(table(com.test1))
@@ -977,7 +978,7 @@ mergePredsList <- function(pred.com, min.group.size=30, t=0.1, verbose=TRUE) {
       }
     }
   }
-  com.all <<- factor(preds.com.init)
+  com.all <- factor(preds.com.init)
 
   return(com.all)
 }

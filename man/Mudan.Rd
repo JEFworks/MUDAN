@@ -15,10 +15,10 @@ R6 object for storing all relevant output from MUDAN analysis in single entity
 {
 library(MUDAN)
 data(pbmcA)
-cd <- pbmcA
+cd <- pbmcA[, 1:500]
 myMudanObject <- Mudan$new("PBMCA", cd)
 myMudanObject$normalizeCounts()
-myMudanObject$normalizeVariance(plot=TRUE)
+myMudanObject$normalizeVariance(plot=FALSE)
 myMudanObject$getPcs(nPcs=30, maxit=1000)
 myMudanObject$getComMembership(communityName='Infomap',
      communityMethod=igraph::cluster_infomap, k=30)

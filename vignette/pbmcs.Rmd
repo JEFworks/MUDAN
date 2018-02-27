@@ -1,10 +1,22 @@
 ---
 title: "Multi-sample Unified Discriminant Analysis"
 author: "Jean Fan"
-date: "February 27, 2018"
+date: '`r Sys.Date()`'
 output:
   pdf_document: default
 ---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(
+    warning = FALSE,
+    message = FALSE,
+    fig.path = 'figure/',
+    cache.path = 'cache/',
+    cache = TRUE,
+    dev = 'png'
+)
+```
 
 ```{r}
 library(MUDAN)
@@ -104,14 +116,6 @@ getModelInfo <- function(name, cd) {
 models.info <- lapply(seq_along(cds.filter), function(i) {
   getModelInfo(names(cds.filter)[i], cds.filter[[i]])
 })
-
-## Plot with individual cluster annotations
-par(mfrow=c(length(models.info),length(models.info)), mar=rep(1,4))
-lapply(1:length(models.info), function(i) {
-  lapply(1:length(models.info), function(j) {
-    plotEmbedding(models.info[[i]]$emb$PCA, groups=pred.com[[j]], mark.clusters=TRUE, mark.cluster.cex = 1)
-  })
-})
 ```
 
 ```{r}
@@ -125,6 +129,17 @@ pred.com <- lapply(preds, function(p) {
   getConfidentPreds(p$posterior)
 })
 names(pred.com) <- names(cds)
+
+## Plot with individual cluster annotations
+par(mfrow=c(length(models.info),length(models.info)), mar=rep(1,4))
+lapply(1:length(models.info), function(i) {
+  lapply(1:length(models.info), function(j) {
+    plotEmbedding(models.info[[i]]$emb$PCA, groups=pred.com[[j]], mark.clusters=TRUE, mark.cluster.cex = 1)
+  })
+})
+```
+
+```{r}
 ## Lds
 lds.all <- do.call(cbind, lapply(preds, function(p) p$x))
 
@@ -165,7 +180,7 @@ emb.lds.bc <- Rtsne::Rtsne(lds.bc,
 rownames(emb.lds.bc) <- rownames(lds.bc)
 
 ## final plot
-par(mfrow=c(3,3))
+par(mfrow=c(3,3), mar=rep(2,4))
 ## combined embedding with individual predicted cluster annotations
 plotEmbedding(emb.lds.bc, groups=pred.com[[1]], mark.clusters=TRUE, mark.cluster.cex = 1)
 plotEmbedding(emb.lds.bc, groups=pred.com[[2]], mark.clusters=TRUE, mark.cluster.cex = 1)

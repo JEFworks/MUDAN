@@ -12,6 +12,8 @@ mergePredsList(pred.com, min.group.size = 30, t = 0.1, verbose = TRUE)
 \item{min.group.size}{Minumum group size}
 
 \item{t}{Percentage increase in entropy that must be achieved to merge annotations}
+
+\item{verbose}{Verbosity}
 }
 \description{
 Merge a list of group annotations
