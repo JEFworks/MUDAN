@@ -12,10 +12,10 @@ Mudan
 R6 object for storing all relevant output from MUDAN analysis in single entity
 }
 \examples{
-{
+\dontrun{
 library(MUDAN)
 data(pbmcA)
-cd <- pbmcA[, 1:500]
+cd <- pbmcA
 myMudanObject <- Mudan$new("PBMCA", cd)
 myMudanObject$normalizeCounts()
 myMudanObject$normalizeVariance(plot=TRUE)
