@@ -6,7 +6,8 @@
 \usage{
 getStableClusters(cd, com, matnorm, z.threshold = 3,
   hclust.method = "ward.D", min.group.size = 10, min.diff.genes = nrow(cd)
-  * 0.005, max.iter = 10, verbose = TRUE, plot = FALSE)
+  * 0.005, max.iter = 10, removeGenes = "^RP|^MT", verbose = TRUE,
+  plot = FALSE)
 }
 \arguments{
 \item{cd}{Counts matrix for differential expression analysis. Rows are genes. Columns are cells.}
@@ -24,6 +25,8 @@ getStableClusters(cd, com, matnorm, z.threshold = 3,
 \item{min.diff.genes}{Minimum number of significantly differentially expressed genes that must be identified or else groups will be merged}
 
 \item{max.iter}{Maximum number of iterations. Will end earlier if convergence reached.}
+
+\item{removeGenes}{Regex expression matching genes you want to remove such as ribosomal or mitochondrial genes.}
 
 \item{verbose}{Verbosity}
 

@@ -736,12 +736,13 @@ getMarkerGenes <- function(mat, com, diffGenes = NULL, upregulated.only=TRUE, z.
 #' @param min.group.size Minimum group size for stable cluster
 #' @param min.diff.genes Minimum number of significantly differentially expressed genes that must be identified or else groups will be merged
 #' @param max.iter Maximum number of iterations. Will end earlier if convergence reached.
+#' @param removeGenes Regex expression matching genes you want to remove such as ribosomal or mitochondrial genes.
 #' @param plot Whether to plot intermediate plots (hierarchical clustering dendrograms)
 #' @param verbose Verbosity
 #'
 #' @export
 #'
-getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.group.size=10, min.diff.genes=nrow(cd)*0.005, max.iter=10, verbose=TRUE, plot=FALSE) {
+getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='ward.D', min.group.size=10, min.diff.genes=nrow(cd)*0.005, max.iter=10, removeGenes = "^RP|^MT", verbose=TRUE, plot=FALSE) {
 
   if(min.group.size>1) {
     com[com %in% levels(com)[table(com)<min.group.size]] <- NA
@@ -765,7 +766,11 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
       x <- na.omit(x)
       return(x)
     })
-    #dg.sig <- dg.sig[!grepl('^RP|^MT', dg.sig)] ## exclude ribosomal and mitochondrial?
+    if(!is.null(removeGenes)) {
+      dg.sig <- lapply(dg.sig, function(dg) {
+        dg <- dg[!grepl(removeGenes, rownames(dg)), ] ## exclude ribosomal and mitochondrial
+      })
+    }
     return(dg.sig)
   }
   ## recursively trace dendrogram
@@ -868,10 +873,26 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     pv.sig.all <- list()
     pv.recur(dend)
     ## test if converged
-    if(i>max.iter) {
+    if(sum(com==com.fin, na.rm=TRUE)>=min(sum(!is.na(com)), sum(!is.na(com.fin)))) {
+      ## computer one last time
+      mat.summary <- do.call(cbind, lapply(levels(com), function(ct) {
+        cells <- which(com==ct)
+        if(length(cells) > 1) {
+          Matrix::rowMeans(matnorm[, cells])
+        } else {
+          matnorm[,cells]
+        }
+      }))
+      colnames(mat.summary) <- levels(com)
+      hc <- hclust(dist(t(mat.summary)), method=hclust.method)
+      if(plot) { plot(hc) }
+      dend <- as.dendrogram(hc)
+      com.fin <- as.character(com)
+      names(com.fin) <- names(com)
+      ## exit
       break
     }
-    if(sum(com==com.fin, na.rm=TRUE)>=min(sum(!is.na(com)), sum(!is.na(com.fin)))) {
+    if(i>max.iter) {
       break
     }
     com <- com.fin
