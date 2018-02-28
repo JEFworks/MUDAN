@@ -874,21 +874,20 @@ getStableClusters <- function(cd, com, matnorm, z.threshold=3, hclust.method='wa
     pv.recur(dend)
     ## test if converged
     if(sum(com==com.fin, na.rm=TRUE)>=min(sum(!is.na(com)), sum(!is.na(com.fin)))) {
-      ## computer one last time
-      mat.summary <- do.call(cbind, lapply(levels(com), function(ct) {
-        cells <- which(com==ct)
+      ## compute one last time
+      com.fin <- factor(com.fin)
+      mat.summary <- do.call(cbind, lapply(levels(com.fin), function(ct) {
+        cells <- which(com.fin==ct)
         if(length(cells) > 1) {
           Matrix::rowMeans(matnorm[, cells])
         } else {
           matnorm[,cells]
         }
       }))
-      colnames(mat.summary) <- levels(com)
+      colnames(mat.summary) <- levels(com.fin)
       hc <- hclust(dist(t(mat.summary)), method=hclust.method)
       if(plot) { plot(hc) }
       dend <- as.dendrogram(hc)
-      com.fin <- as.character(com)
-      names(com.fin) <- names(com)
       ## exit
       break
     }
