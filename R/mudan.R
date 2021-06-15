@@ -399,60 +399,49 @@ getComMembership <- function(mat, k, method=igraph::cluster_walktrap, verbose=TR
 #' }
 #'
 #' @export
-getApproxComMembership <- function(mat, k, nsubsample=ncol(mat)*0.5, method=igraph::cluster_walktrap, seed=0, vote=FALSE, verbose=TRUE) {
-
-  if(verbose) {
-    print(paste0('Subsampling from ', ncol(mat), ' cells to ', nsubsample, ' ... '))
+getApproxComMembership <- function (mat, k, nsubsample = nrow(mat) * 0.5, method = igraph::cluster_walktrap,
+                                    seed = 0, vote = FALSE, verbose = TRUE)
+{
+  if (verbose) {
+    print(paste0("Subsampling from ", nrow(mat), " cells to ",
+                 nsubsample, " ... "))
   }
-  ## random subsampling
-  ## TODO: density based downsampling
   set.seed(seed)
   subsample <- sample(rownames(mat), nsubsample)
-
-  if(verbose) {
-    print('Identifying cluster membership for subsample ... ')
+  if (verbose) {
+    print("Identifying cluster membership for subsample ... ")
   }
   pcs.sub <- mat[subsample, ]
-  com.sub <- getComMembership(pcs.sub, k=k, method=method)
-
-  if(verbose) {
-    print('Imputing cluster membership for rest of cells ... ')
+  com.sub <- getComMembership(pcs.sub, k = k, method = method)
+  if (verbose) {
+    print("Imputing cluster membership for rest of cells ... ")
   }
-
-  ## Use neighbor voting
-  if(vote) {
+  if (vote) {
     data <- mat[subsample, ]
     query <- mat[setdiff(rownames(mat), subsample), ]
-    knn <- RANN::nn2(data, query, k=k)[[1]]
+    knn <- RANN::nn2(data, query, k = k)[[1]]
     rownames(knn) <- rownames(query)
     com.nonsub <- unlist(apply(knn, 1, function(x) {
-      ## nearest neighbors in data
       nn <- rownames(data)[x]
-      ## look at their cell type annotations
       nn.com <- com.sub[nn]
-      ## get most frequent annotation
-      return(names(sort(table(nn.com), decreasing=TRUE)[1]))
+      return(names(sort(table(nn.com), decreasing = TRUE)[1]))
     }))
     com.all <- factor(c(com.sub, com.nonsub)[rownames(mat)])
   }
   else {
-    ## Use model instead
-    ## Inspired by DenSVM
-    df.sub <- data.frame(celltype=com.sub, pcs.sub)
-    model <- MASS::lda(celltype ~ ., data=df.sub)
+    df.sub <- data.frame(celltype = com.sub, pcs.sub)
+    model <- MASS::lda(celltype ~ ., data = df.sub)
     df.all <- data.frame(mat)
     model.output <- stats::predict(model, df.all)
     com.all <- model.output$class
     names(com.all) <- rownames(df.all)
-    if(verbose) {
+    if (verbose) {
       print("Model accuracy for subsample ...")
-      print(table(com.all[names(com.sub)]==com.sub))
+      print(table(com.all[names(com.sub)] == com.sub))
     }
   }
-
   return(com.all)
 }
-
 
 #' Linear discriminant analysis model
 #'
